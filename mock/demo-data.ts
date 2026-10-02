@@ -1,63 +1,54 @@
-import type { Item, NewItem } from '@/types/item';
+/**
+ * ==============================================================================
+ * MOCK DATA TEMPLATE — Zdefiniuj tutaj dane demonstracyjne po ogłoszeniu tematu
+ * ==============================================================================
+ * Zasady dla agenta Antigravity:
+ * 1. Zawsze używaj stałych ID (UUID lub unikalne stringi) i stałych dat (ISO),
+ *    aby uniknąć błędów hydracji w SSR.
+ * 2. Struktura obiektów musi odpowiadać typom domenowym z folderu types/.
+ * 3. Zdefiniuj SAMPLE_INPUTS do rotacyjnego wypełniania formularza przez przycisk:
+ *    [✨ Wypełnij przykładowe dane].
+ */
 
-export const DEMO_ITEMS: Item[] = [
+export interface DemoItemPlaceholder {
+  id: string;
+  name: string;
+  category: string;
+  value: number;
+  status: 'active' | 'pending' | 'completed';
+  created_at: string;
+}
+
+export const INITIAL_DEMO_DATA: DemoItemPlaceholder[] = [
   {
     id: '11111111-1111-4111-8111-111111111111',
-    title: 'Automatyczna weryfikacja danych wejściowych',
-    category: 'Diagnostyka',
-    value: 12500,
-    status: 'done',
+    name: 'Przykładowy rekord #1',
+    category: 'Ogólne',
+    value: 12000,
+    status: 'completed',
     created_at: '2026-10-02T10:00:00Z',
   },
   {
     id: '22222222-2222-4222-8222-222222222222',
-    title: 'Optymalizacja zużycia energii w węźle A3',
-    category: 'Ekologia',
-    value: 8400,
-    status: 'done',
-    created_at: '2026-10-02T11:30:00Z',
-  },
-  {
-    id: '33333333-3333-4333-8333-333333333333',
-    title: 'Analiza predykcyjna drgań pompy głównej',
-    category: 'Prewencja',
-    value: 19800,
-    status: 'in_progress',
-    created_at: '2026-10-02T14:15:00Z',
-  },
-  {
-    id: '44444444-4444-4444-8444-444444444444',
-    title: 'Kompensacja mocy biernej na linii montażowej',
-    category: 'Infrastruktura',
-    value: 6200,
-    status: 'new',
-    created_at: '2026-10-02T16:45:00Z',
+    name: 'Przykładowy rekord #2',
+    category: 'Priorytet',
+    value: 8500,
+    status: 'active',
+    created_at: '2026-10-02T12:00:00Z',
   },
 ];
 
-export const SAMPLE_INPUTS: NewItem[] = [
+export const SAMPLE_INPUTS: Array<Omit<DemoItemPlaceholder, 'id' | 'created_at'>> = [
   {
-    title: 'Wykrycie mikropęknięć głowicy skrawającej',
-    category: 'Diagnostyka',
-    value: 15400,
-    status: 'new',
+    name: 'Nowa inicjatywa demonstracyjna A',
+    category: 'Innowacja',
+    value: 15000,
+    status: 'active',
   },
   {
-    title: 'Rekuperacja ciepła odpadowego ze sprężarki',
-    category: 'Ekologia',
-    value: 9300,
-    status: 'in_progress',
-  },
-  {
-    title: 'Kalibracja czujników ciśnienia instalacji hydraulicznej',
-    category: 'Prewencja',
-    value: 4800,
-    status: 'done',
-  },
-  {
-    title: 'Modernizacja rozdzielnicy zasilania sekcji B',
-    category: 'Infrastruktura',
-    value: 22100,
-    status: 'in_progress',
+    name: 'Zgłoszenie optymalizacyjne B',
+    category: 'Priorytet',
+    value: 23000,
+    status: 'completed',
   },
 ];
