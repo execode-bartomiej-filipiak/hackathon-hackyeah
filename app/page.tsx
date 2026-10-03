@@ -1,12 +1,14 @@
 import { isDemoMode } from '@/lib/demo';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { HackathonLaunchpad } from '@/components/hackathon-launchpad';
+import { RecordsPreview } from '@/components/records-preview';
+import { getRecords } from '@/lib/data/records';
 import { Code2Icon } from 'lucide-react';
 
 export default async function HomePage() {
   const isDemo = await isDemoMode();
   const supabaseConfigured = isSupabaseConfigured();
-
+  const { data: records, source } = await getRecords();
   return (
     <div className="min-h-screen bg-muted/20">
       {/* GŁÓWNY NAGŁÓWEK */}
@@ -30,10 +32,16 @@ export default async function HomePage() {
 
       {/* GŁÓWNA ZAWARTOŚĆ */}
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-10">
-        <HackathonLaunchpad
-          isDemo={isDemo}
-          supabaseConfigured={supabaseConfigured}
-        />
+        <div className="space-y-8">
+          <RecordsPreview
+            initialRecords={records}
+            source={source}
+          />
+          <HackathonLaunchpad
+            isDemo={isDemo}
+            supabaseConfigured={supabaseConfigured}
+          />
+        </div>
       </main>
 
       {/* STOPKA */}
