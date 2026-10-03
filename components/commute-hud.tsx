@@ -20,7 +20,7 @@ import {
   TrendingDownIcon,
   TrendingUpIcon,
   ChevronRightIcon,
-  MapPinIcon,
+
   Building2Icon,
   CrosshairIcon,
   PencilIcon,
@@ -64,7 +64,6 @@ interface CommuteHudProps {
   homeBuildingName?: string;
   referenceBuildingName?: string;
   selectedBuildingName?: string;
-  hasPresetLoaded?: boolean;
   activeFocusPoint?: 'home' | 'reference';
   onSelectFocusPoint?: (point: 'home' | 'reference') => void;
   onFocusDestination?: (route: CommuteRouteResult) => void;
@@ -90,7 +89,6 @@ export function CommuteHud({
   homeBuildingName,
   referenceBuildingName,
   selectedBuildingName,
-  hasPresetLoaded = false,
   activeFocusPoint = 'reference',
   onSelectFocusPoint,
   onFocusDestination,
@@ -119,6 +117,15 @@ export function CommuteHud({
 
   const effectiveHomeName = homeBuildingName || (!referenceBuildingName ? selectedBuildingName : undefined);
   const effectiveRefName = referenceBuildingName;
+
+  // Bohater panelu: zaoszczędzony czas tygodniowo (względem mieszkania lub normy krakowskiej)
+  const comparison = analysis?.comparisonToHome;
+  const hasReference = Boolean(comparison?.hasReference);
+  const savedHours = hasReference
+    ? comparison?.savedHoursPerWeek ?? 0
+    : analysis?.weeklySavingsHours ?? 0;
+  const timeSaved = savedHours >= 0;
+  const timeScope = hasReference ? 'vs mieszkanie' : 'vs norma krakowska';
 
   return (
     <div className="absolute top-4 right-4 z-20 w-80 sm:w-96 max-h-[calc(100vh-2rem)] flex flex-col gap-2.5 overflow-y-auto pointer-events-auto select-none font-sans scrollbar-none">
@@ -401,73 +408,32 @@ export function CommuteHud({
           ) : (
             /* WYNIKI ANALIZY COMMUTE SCORE */
             <div className="space-y-3 animate-in fade-in">
-              {/* 1. SCALONA, KOMPAKTOWA SEKCJA KPI NA SAMEJ GÓRZE */}
-              <div className="p-3 rounded-xl border border-border bg-card shadow-xs space-y-2.5">
+              {/* 1. KPI: WYEKSPONOWANA OSZCZĘDNOŚĆ CZASU + SCORE, CO₂ ZDEEMFATYZOWANE */}
+              <div className="p-3.5 rounded-xl border border-border bg-card shadow-xs space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  {/* LEWA STRONA: ZWIĘZŁE WIERSZE Z KOLEJNYMI KPI */}
-                  <div className="min-w-0 flex-1 space-y-2">
-                    {/* WIERSZ 1: CZAS W DRODZE */}
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                        <ClockIcon className="size-3.5 text-primary shrink-0" />
-                        <span>{analysis.totalHoursPerWeek} h</span>
-                        <span className="text-[10px] text-muted-foreground font-normal">/ tydzień</span>
-                      </div>
-                      <div className="text-[10px] font-medium pl-5">
-                        {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (
-                          analysis.comparisonToHome.savedHoursPerWeek >= 0 ? (
-                            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                              <TrendingDownIcon className="size-3" />
-                              Oszczędzasz {analysis.comparisonToHome.savedHoursPerWeek} h/tydz. vs mieszkanie
-                            </span>
-                          ) : (
-                            <span className="text-rose-500 flex items-center gap-0.5">
-                              <TrendingUpIcon className="size-3" />
-                              +{Math.abs(analysis.comparisonToHome.savedHoursPerWeek)} h/tydz. dłużej vs mieszkanie
-                            </span>
-                          )
-                        ) : analysis.weeklySavingsHours >= 0 ? (
-                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                            <TrendingDownIcon className="size-3" />
-                            Oszczędzasz {analysis.weeklySavingsHours} h/tydz. vs norma
-                          </span>
-                        ) : (
-                          <span className="text-rose-500 flex items-center gap-0.5">
-                            <TrendingUpIcon className="size-3" />
-                            +{Math.abs(analysis.weeklySavingsHours)} h ponad normę
-                          </span>
-                        )}
-                      </div>
+                  {/* LEWA STRONA: BOHATER — ZAOSZCZĘDZONY CZAS W TYGODNIU */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {timeSaved ? (
+                        <TrendingDownIcon className="size-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <TrendingUpIcon className="size-3.5 text-rose-500 shrink-0" />
+                      )}
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                        {timeSaved ? 'Oszczędzasz' : 'Tracisz'}
+                      </span>
                     </div>
-
-                    {/* WIERSZ 2: ZANIECZYSZCZENIE ŚRODOWISKA (CO2) */}
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                        <LeafIcon className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>{analysis.totalWeeklyCo2Kg} kg CO₂</span>
-                        <span className="text-[10px] text-muted-foreground font-normal">/ tydzień</span>
-                      </div>
-                      <div className="text-[10px] font-medium pl-5">
-                        {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (
-                          analysis.comparisonToHome.savedCo2Kg >= 0 ? (
-                            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                              <TrendingDownIcon className="size-3" />
-                              Oszczędzasz {analysis.comparisonToHome.savedCo2Kg} kg CO₂/tydz. vs mieszkanie
-                            </span>
-                          ) : (
-                            <span className="text-rose-500 flex items-center gap-0.5">
-                              <TrendingUpIcon className="size-3" />
-                              +{Math.abs(analysis.comparisonToHome.savedCo2Kg)} kg CO₂/tydz. vs mieszkanie
-                            </span>
-                          )
-                        ) : (
-                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                            <TrendingDownIcon className="size-3" />
-                            Oszczędzasz {analysis.weeklyCo2SavingsKg} kg vs auto
-                          </span>
-                        )}
-                      </div>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span
+                        className={`text-3xl font-black leading-none tabular-nums ${
+                          timeSaved ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
+                        }`}
+                      >
+                        {Math.abs(savedHours).toFixed(1)}
+                      </span>
+                      <span className="text-sm font-bold text-foreground/80 leading-none">h / tydz.</span>
                     </div>
+                    <div className="text-[10px] text-muted-foreground font-medium mt-1.5">{timeScope}</div>
                   </div>
 
                   {/* PRAWA STRONA: STAŁY, NIENARUSZONY PIERŚCIEŃ PUNKTOWY SCORE */}
@@ -478,11 +444,28 @@ export function CommuteHud({
                   >
                     <span className="text-xl font-black leading-none">{analysis.score}</span>
                     <span className="text-[9px] uppercase font-bold tracking-wider opacity-80 mt-0.5">
-                      {analysis.comparisonToHome && analysis.comparisonToHome.hasReference
-                        ? `${analysis.comparisonToHome.scoreDelta >= 0 ? '+' : ''}${analysis.comparisonToHome.scoreDelta} vs dom`
-                        : 'Score'}
+                      Score
                     </span>
                   </div>
+                </div>
+
+                {/* PASEK POMOCNICZY: CZAS W DRODZE I CO₂ (INFORMACJE DRUGORZĘDNE) */}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-2 border-t border-border/50 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <ClockIcon className="size-3 shrink-0" />
+                    <span className="font-semibold text-foreground/80">
+                      {analysis.totalHoursPerWeek} h
+                    </span>
+                    w drodze
+                  </span>
+                  <span className="text-border">•</span>
+                  <span className="flex items-center gap-1">
+                    <LeafIcon className="size-3 shrink-0" />
+                    <span className="font-semibold text-foreground/80">
+                      {analysis.totalWeeklyCo2Kg} kg
+                    </span>
+                    CO₂
+                  </span>
                 </div>
 
                 {/* PRZYCISK OTWARCIA MODALU ZE SZCZEGÓŁAMI */}

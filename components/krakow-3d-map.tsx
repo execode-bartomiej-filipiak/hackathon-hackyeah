@@ -1599,7 +1599,6 @@ export function Krakow3DMap() {
         homeBuildingName={homeBuilding?.name}
         referenceBuildingName={referenceBuilding?.name}
         selectedBuildingName={activeOriginBuilding?.name}
-        hasPresetLoaded={hasPresetLoaded}
         activeFocusPoint={activeFocusPoint}
         onSelectFocusPoint={handleSelectFocusPoint}
         onFocusDestination={handleFocusDestination}
