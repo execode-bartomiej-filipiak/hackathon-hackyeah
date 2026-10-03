@@ -242,9 +242,17 @@ export function CommuteHud({
               {/* LISTA PUNKTÓW DOCELOWYCH */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
-                  <span>Twoje cele podróży ({analysis.routes.length}):</span>
+                  <div className="flex items-center gap-1.5">
+                    <span>Cele ({analysis.routes.length}):</span>
+                    {analysis.routes.some((r) => r.isRealRoute) && (
+                      <span className="text-[9px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Trasy uliczne OSM
+                      </span>
+                    )}
+                  </div>
                   {selectedBuildingName && (
-                    <span className="font-normal truncate max-w-[140px] text-foreground">
+                    <span className="font-normal truncate max-w-[130px] text-foreground">
                       Z: {selectedBuildingName}
                     </span>
                   )}

@@ -167,3 +167,157 @@ export function calculateCommuteAnalysis(
     routes,
   };
 }
+
+// Podręczny cache tras OSRM w pamięci klienta (unikamy powtarzających się zapytań)
+const routeCache = new Map<
+  string,
+  { coordinates: Array<[number, number]>; durationMinutes: number; distanceKm: number }
+>();
+
+function getCacheKey(origin: [number, number], dest: [number, number], mode: TravelMode): string {
+  return `${origin[0].toFixed(4)},${origin[1].toFixed(4)}-${dest[0].toFixed(4)},${dest[1].toFixed(4)}-${mode}`;
+}
+
+/**
+ * Pobiera rzeczywistą trasę po ulicach Krakowa z API OSRM (Open Source Routing Machine)
+ * W razie błędu sieci lub timeoutu zwraca null (wyzwalając bezpieczny fallback na łuk).
+ */
+export async function fetchOsmStreetRoute(
+  origin: [number, number],
+  dest: [number, number],
+  mode: TravelMode,
+  signal?: AbortSignal
+): Promise<{ coordinates: Array<[number, number]>; durationMinutes: number; distanceKm: number } | null> {
+  const cacheKey = getCacheKey(origin, dest, mode);
+  const cached = routeCache.get(cacheKey);
+  if (cached) return cached;
+
+  // Profil OSRM
+  const profile = mode === 'bicycling' ? 'bike' : mode === 'walking' ? 'foot' : 'driving';
+  const url = `https://router.project-osrm.org/route/v1/${profile}/${origin[0]},${origin[1]};${dest[0]},${dest[1]}?overview=full&geometries=geojson`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2400);
+
+    const onAbort = () => controller.abort();
+    if (signal) signal.addEventListener('abort', onAbort, { once: true });
+
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (signal) signal.removeEventListener('abort', onAbort);
+
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as {
+      code: string;
+      routes?: Array<{
+        distance: number; // w metrach
+        duration: number; // w sekundach
+        geometry?: {
+          type: 'LineString';
+          coordinates: Array<[number, number]>;
+        };
+      }>;
+    };
+
+    if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+      return null;
+    }
+
+    const route = data.routes[0];
+    const coords = route.geometry?.coordinates;
+    if (!coords || coords.length < 2) return null;
+
+    const distanceKm = Number((route.distance / 1000).toFixed(1));
+    let durationMinutes = 0;
+
+    switch (mode) {
+      case 'driving':
+        // Czas jazdy OSRM + 3.5 min stałego czasu na parkowanie/dojście
+        durationMinutes = Math.max(3, Math.round(route.duration / 60 + 3.5));
+        break;
+      case 'transit':
+        // Trasa poprowadzona głównymi korytarzami drogowymi + parametry MPK Kraków (19 km/h + 4.5 min przystanki)
+        durationMinutes = Math.max(4, Math.round((distanceKm / 19) * 60 + 4.5));
+        break;
+      case 'bicycling':
+      case 'walking':
+        durationMinutes = Math.max(2, Math.round(route.duration / 60));
+        break;
+    }
+
+    const result = {
+      coordinates: coords,
+      durationMinutes,
+      distanceKm,
+    };
+
+    routeCache.set(cacheKey, result);
+    return result;
+  } catch {
+    // Cichy fallback przy braku sieci / timeoutcie
+    return null;
+  }
+}
+
+/**
+ * Asynchroniczna analiza wzbogacona o realne trasy uliczne (OSRM)
+ * Równolegle pobiera trasy uliczne z gwarantowanym fallbackiem na model estymacyjny.
+ */
+export async function fetchEnhancedCommuteAnalysis(
+  origin: [number, number],
+  destinations: CommuteDestination[],
+  fallbackMode: TravelMode = 'transit',
+  signal?: AbortSignal
+): Promise<CommuteAnalysis> {
+  // Najpierw baza z obliczeń wstępnych
+  const baseAnalysis = calculateCommuteAnalysis(origin, destinations, fallbackMode);
+
+  // Pobieramy trasy drogowe równolegle
+  const routePromises = baseAnalysis.routes.map(async (baseRoute) => {
+    const dest = destinations.find((d) => d.id === baseRoute.destinationId);
+    if (!dest) return baseRoute;
+
+    const effectiveMode = dest.travelMode || fallbackMode;
+    const realRoute = await fetchOsmStreetRoute(origin, dest.coordinates, effectiveMode, signal);
+
+    if (realRoute && realRoute.coordinates.length >= 2) {
+      return {
+        ...baseRoute,
+        distanceKm: realRoute.distanceKm,
+        durationMinutes: realRoute.durationMinutes,
+        status: getRouteStatus(realRoute.durationMinutes),
+        trajectoryCoordinates: realRoute.coordinates,
+        isRealRoute: true,
+      };
+    }
+
+    return baseRoute;
+  });
+
+  const updatedRoutes = await Promise.all(routePromises);
+
+  // Przeliczenie bilansu tygodniowego na bazie realnych czasów
+  let totalWeeklyMinutes = 0;
+  updatedRoutes.forEach((route) => {
+    const dest = destinations.find((d) => d.id === route.destinationId);
+    const freq = dest ? dest.frequencyPerWeek : 2;
+    totalWeeklyMinutes += route.durationMinutes * 2 * freq;
+  });
+
+  const totalHoursPerWeek = Number((totalWeeklyMinutes / 60).toFixed(1));
+  const KRAKOW_BENCHMARK_HOURS = 7.2;
+  const weeklySavingsHours = Number((KRAKOW_BENCHMARK_HOURS - totalHoursPerWeek).toFixed(1));
+
+  const rawScore = 100 - (totalHoursPerWeek / 12) * 60;
+  const score = Math.max(12, Math.min(98, Math.round(rawScore)));
+
+  return {
+    score,
+    totalHoursPerWeek,
+    weeklySavingsHours,
+    routes: updatedRoutes,
+  };
+}
+

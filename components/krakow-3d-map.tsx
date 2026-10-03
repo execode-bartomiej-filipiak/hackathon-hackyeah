@@ -19,7 +19,7 @@ import {
   CrosshairIcon,
 } from 'lucide-react';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
-import { calculateCommuteAnalysis } from '@/lib/commute';
+import { calculateCommuteAnalysis, fetchEnhancedCommuteAnalysis } from '@/lib/commute';
 import { CommuteHud } from '@/components/commute-hud';
 import { AddDestinationDialog } from '@/components/add-destination-dialog';
 import type {
@@ -733,15 +733,43 @@ export function Krakow3DMap() {
     if (!map || !mapLoaded) return;
 
     if (selectedBuilding) {
-      const analysis = calculateCommuteAnalysis(
+      // 1. Natychmiastowe obliczenia bazowe (błyskawiczny start i płynne wystrzelenie linii)
+      const baseAnalysis = calculateCommuteAnalysis(
         selectedBuilding.coordinates,
         activeProfile.destinations
       );
-      setCommuteAnalysis(analysis);
-      routesRef.current = analysis.routes;
+      setCommuteAnalysis(baseAnalysis);
+      routesRef.current = baseAnalysis.routes;
       unfurlProgressRef.current = 0; // Wyzwala efekt wystrzelenia linii
       animProgressRef.current = 0;
-      updateDestinationMarkers(map, activeProfile.destinations, analysis.routes);
+      updateDestinationMarkers(map, activeProfile.destinations, baseAnalysis.routes);
+
+      // 2. Asynchroniczne dociągnięcie prawdziwych tras po ulicach Krakowa (OSRM)
+      const controller = new AbortController();
+      let isCancelled = false;
+
+      fetchEnhancedCommuteAnalysis(
+        selectedBuilding.coordinates,
+        activeProfile.destinations,
+        'transit',
+        controller.signal
+      )
+        .then((realAnalysis) => {
+          if (isCancelled || !mapRef.current) return;
+          setCommuteAnalysis(realAnalysis);
+          routesRef.current = realAnalysis.routes;
+          unfurlProgressRef.current = 1;
+          updateTrajectoriesLayer(mapRef.current, realAnalysis.routes);
+          updateDestinationMarkers(mapRef.current, activeProfile.destinations, realAnalysis.routes);
+        })
+        .catch(() => {
+          // cichy fallback na bazę obliczeniową
+        });
+
+      return () => {
+        isCancelled = true;
+        controller.abort();
+      };
     } else {
       setCommuteAnalysis(null);
       routesRef.current = [];

@@ -20,6 +20,7 @@ export interface CommuteRouteResult {
   travelMode: TravelMode;
   status: 'optimal' | 'moderate' | 'heavy'; // <15m optymalny, 15-30m umiarkowany, >30m uciążliwy
   trajectoryCoordinates: Array<[number, number]>;
+  isRealRoute?: boolean;
 }
 
 export interface CommuteAnalysis {
