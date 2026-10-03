@@ -24,6 +24,32 @@ import {
   XIcon,
 } from 'lucide-react';
 
+function getTransportIcon(mode: TravelMode) {
+  switch (mode) {
+    case 'transit':
+      return <TrainIcon className="size-3 text-primary" />;
+    case 'driving':
+      return <CarIcon className="size-3 text-primary" />;
+    case 'bicycling':
+      return <BikeIcon className="size-3 text-primary" />;
+    case 'walking':
+      return <FootprintsIcon className="size-3 text-primary" />;
+  }
+}
+
+function getTransportLabel(mode: TravelMode): string {
+  switch (mode) {
+    case 'transit':
+      return 'MPK';
+    case 'driving':
+      return 'Auto';
+    case 'bicycling':
+      return 'Rower';
+    case 'walking':
+      return 'Pieszo';
+  }
+}
+
 interface CommuteHudProps {
   activeProfile: CommuteProfile;
   analysis: CommuteAnalysis | null;
@@ -122,56 +148,21 @@ export function CommuteHud({
 
                       <div className="flex items-center gap-1.5 shrink-0">
                         {/* PRZEŁĄCZNIK ŚRODKA TRANSPORTU DLA CELU */}
-                        <div className="flex items-center gap-0.5 bg-muted/60 p-0.5 rounded-lg border border-border/40">
-                          <button
-                            type="button"
-                            onClick={() => onUpdateDestinationMode?.(dest.id, 'transit')}
-                            className={`p-1 rounded text-[10px] transition-colors ${
-                              dest.travelMode === 'transit'
-                                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title="MPK (Tramwaj / Autobus)"
-                          >
-                            <TrainIcon className="size-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateDestinationMode?.(dest.id, 'driving')}
-                            className={`p-1 rounded text-[10px] transition-colors ${
-                              dest.travelMode === 'driving'
-                                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title="Samochód"
-                          >
-                            <CarIcon className="size-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateDestinationMode?.(dest.id, 'bicycling')}
-                            className={`p-1 rounded text-[10px] transition-colors ${
-                              dest.travelMode === 'bicycling'
-                                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title="Rower"
-                          >
-                            <BikeIcon className="size-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateDestinationMode?.(dest.id, 'walking')}
-                            className={`p-1 rounded text-[10px] transition-colors ${
-                              dest.travelMode === 'walking'
-                                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title="Pieszo"
-                          >
-                            <FootprintsIcon className="size-3" />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const modes: TravelMode[] = ['transit', 'driving', 'bicycling', 'walking'];
+                            const nextMode = modes[(modes.indexOf(dest.travelMode) + 1) % modes.length];
+                            onUpdateDestinationMode?.(dest.id, nextMode);
+                          }}
+                          className="flex items-center gap-1 py-1 px-1.5 rounded-lg bg-muted/60 hover:bg-muted text-foreground border border-border/40 text-[11px] transition-colors"
+                          title={`Środek transportu: ${getTransportLabel(dest.travelMode)} (kliknij, aby zmienić)`}
+                        >
+                          {getTransportIcon(dest.travelMode)}
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {getTransportLabel(dest.travelMode)}
+                          </span>
+                        </button>
 
                         {onRemoveDestination && activeProfile.destinations.length > 1 && (
                           <button
@@ -291,67 +282,22 @@ export function CommuteHud({
 
                         <div className="flex items-center gap-2 shrink-0">
                           {/* PRZEŁĄCZNIK TRANSPORTU DLA TEGO CELU */}
-                          <div
-                            className="flex items-center gap-0.5 bg-muted/60 p-0.5 rounded-lg border border-border/40"
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const modes: TravelMode[] = ['transit', 'driving', 'bicycling', 'walking'];
+                              const nextMode = modes[(modes.indexOf(currentMode) + 1) % modes.length];
+                              onUpdateDestinationMode?.(route.destinationId, nextMode);
+                            }}
+                            className="flex items-center gap-1 py-1 px-1.5 rounded-lg bg-muted/60 hover:bg-muted text-foreground border border-border/40 text-[11px] transition-colors"
+                            title={`Środek transportu: ${getTransportLabel(currentMode)} (kliknij, aby zmienić)`}
                           >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onUpdateDestinationMode?.(route.destinationId, 'transit')
-                              }
-                              className={`p-1 rounded text-[10px] transition-colors ${
-                                currentMode === 'transit'
-                                  ? 'bg-primary text-primary-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                              title="MPK (Tramwaj / Autobus)"
-                            >
-                              <TrainIcon className="size-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onUpdateDestinationMode?.(route.destinationId, 'driving')
-                              }
-                              className={`p-1 rounded text-[10px] transition-colors ${
-                                currentMode === 'driving'
-                                  ? 'bg-primary text-primary-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                              title="Samochód"
-                            >
-                              <CarIcon className="size-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onUpdateDestinationMode?.(route.destinationId, 'bicycling')
-                              }
-                              className={`p-1 rounded text-[10px] transition-colors ${
-                                currentMode === 'bicycling'
-                                  ? 'bg-primary text-primary-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                              title="Rower"
-                            >
-                              <BikeIcon className="size-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onUpdateDestinationMode?.(route.destinationId, 'walking')
-                              }
-                              className={`p-1 rounded text-[10px] transition-colors ${
-                                currentMode === 'walking'
-                                  ? 'bg-primary text-primary-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                              title="Pieszo"
-                            >
-                              <FootprintsIcon className="size-3" />
-                            </button>
-                          </div>
+                            {getTransportIcon(currentMode)}
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {getTransportLabel(currentMode)}
+                            </span>
+                          </button>
 
                           {/* CZAS BEZ BADGE'A <15m */}
                           <div className="text-right min-w-[44px]">

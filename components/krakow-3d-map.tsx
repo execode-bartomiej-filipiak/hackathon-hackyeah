@@ -21,6 +21,7 @@ import {
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import { calculateCommuteAnalysis } from '@/lib/commute';
 import { CommuteHud } from '@/components/commute-hud';
+import { AddDestinationDialog } from '@/components/add-destination-dialog';
 import type {
   CommuteProfile,
   TravelMode,
@@ -31,11 +32,17 @@ import type {
 
 interface SelectedBuildingInfo {
   name: string;
-  type: string;
-  height: number;
-  levels: number;
+  type?: string;
+  height?: number;
+  levels?: number;
   district: string;
   coordinates: [number, number];
+}
+
+interface PendingNewDestination {
+  coordinates: [number, number];
+  initialAddress: string;
+  district: string;
 }
 
 interface PulseLineFeature {
@@ -252,6 +259,9 @@ export function Krakow3DMap() {
     );
   };
 
+
+  const [pendingDestination, setPendingDestination] = useState<PendingNewDestination | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [commuteAnalysis, setCommuteAnalysis] = useState<CommuteAnalysis | null>(null);
   // Aktualizacja markerów celów na mapie 3D
   const updateDestinationMarkers = useCallback(
@@ -550,43 +560,28 @@ export function Krakow3DMap() {
         if (isAddingTargetRef.current) {
           const currentLng = e.lngLat.lng;
           const currentLat = e.lngLat.lat;
-          const tempId = 'dest_custom_' + Date.now();
           const initialDistrict = getDistrict(currentLng, currentLat);
-
-          const newDest: CommuteDestination = {
-            id: tempId,
-            name: `Punkt (${initialDistrict})`,
-            category: 'other',
-            icon: '🎯',
-            coordinates: [currentLng, currentLat],
-            frequencyPerWeek: 3,
-            travelMode: 'transit',
-          };
-
-          setProfiles((prev) =>
-            prev.map((p) =>
-              p.id === activeProfileIdRef.current
-                ? { ...p, destinations: [...p.destinations, newDest] }
-                : p
-            )
-          );
-
           setIsAddingTarget(false);
 
-          // Asynchroniczne pobranie dokładnego adresu ulicy
+          setPendingDestination({
+            coordinates: [currentLng, currentLat],
+            initialAddress: `Kraków, ${initialDistrict}`,
+            district: initialDistrict,
+          });
+          setIsAddDialogOpen(true);
+
           reverseGeocodeKrakow(currentLng, currentLat).then((resolved) => {
-            setProfiles((prev) =>
-              prev.map((p) =>
-                p.id === activeProfileIdRef.current
-                  ? {
-                      ...p,
-                      destinations: p.destinations.map((d) =>
-                        d.id === tempId ? { ...d, name: resolved.address } : d
-                      ),
-                    }
-                  : p
-              )
-            );
+            setPendingDestination((prev) => {
+              if (!prev) return null;
+              if (prev.coordinates[0] === currentLng && prev.coordinates[1] === currentLat) {
+                return {
+                  ...prev,
+                  initialAddress: resolved.address,
+                  district: resolved.district,
+                };
+              }
+              return prev;
+            });
           });
 
           return;
@@ -1001,6 +996,37 @@ export function Krakow3DMap() {
     );
   };
 
+  // Zatwierdzenie nowego celu z modala
+  const handleConfirmAddDestination = (data: {
+    name: string;
+    category: CommuteDestination['category'];
+    icon: string;
+    frequencyPerWeek: number;
+    travelMode: TravelMode;
+    coordinates: [number, number];
+  }) => {
+    const newDest: CommuteDestination = {
+      id: 'dest_custom_' + Date.now(),
+      name: data.name,
+      category: data.category,
+      icon: data.icon,
+      coordinates: data.coordinates,
+      frequencyPerWeek: data.frequencyPerWeek,
+      travelMode: data.travelMode,
+    };
+
+    setProfiles((prev) =>
+      prev.map((p) =>
+        p.id === activeProfile.id
+          ? { ...p, destinations: [...p.destinations, newDest] }
+          : p
+      )
+    );
+
+    setIsAddDialogOpen(false);
+    setPendingDestination(null);
+  };
+
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
@@ -1094,6 +1120,21 @@ export function Krakow3DMap() {
         <InfoIcon className="size-3.5 text-primary" />
         <span>Kliknij dowolny budynek w 3D, aby wyliczyć czas dojazdów do punktów życia.</span>
       </div>
+
+      {/* MODAL DEFINIOWANIA NOWEGO CELU */}
+      {pendingDestination && (
+        <AddDestinationDialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            setIsAddDialogOpen(open);
+            if (!open) setPendingDestination(null);
+          }}
+          coordinates={pendingDestination.coordinates}
+          initialAddress={pendingDestination.initialAddress}
+          district={pendingDestination.district}
+          onConfirm={handleConfirmAddDestination}
+        />
+      )}
     </div>
   );
 }
