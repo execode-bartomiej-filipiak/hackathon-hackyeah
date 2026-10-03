@@ -36,7 +36,7 @@ export function calculateHaversineKm(
 export function generateTrajectoryCoordinates(
   origin: [number, number],
   dest: [number, number],
-  numPoints = 24
+  numPoints = 40
 ): Array<[number, number]> {
   const [lng1, lat1] = origin;
   const [lng2, lat2] = dest;

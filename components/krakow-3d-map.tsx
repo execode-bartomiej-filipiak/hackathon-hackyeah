@@ -43,6 +43,24 @@ interface SelectedBuildingInfo {
   coordinates: [number, number];
 }
 
+interface PulseLineFeature {
+  type: 'Feature';
+  properties: { status: 'optimal' | 'moderate' | 'heavy' };
+  geometry: {
+    type: 'LineString';
+    coordinates: Array<[number, number]>;
+  };
+}
+
+interface PulseHeadFeature {
+  type: 'Feature';
+  properties: { status: 'optimal' | 'moderate' | 'heavy' };
+  geometry: {
+    type: 'Point';
+    coordinates: [number, number];
+  };
+}
+
 function getDistrict(lng: number, lat: number): string {
   const distRynek = Math.hypot(lng - 19.9373, lat - 50.0617);
   const distWawel = Math.hypot(lng - 19.9354, lat - 50.0540);
@@ -64,7 +82,10 @@ export function Krakow3DMap() {
   const popupRef = useRef<Popup | null>(null);
   const isRotatingRef = useRef(false);
   const destinationMarkersRef = useRef<maplibregl.Marker[]>([]);
-
+  const routesRef = useRef<CommuteRouteResult[]>([]);
+  const unfurlProgressRef = useRef(0);
+  const animProgressRef = useRef(0);
+  const animFrameRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuildingInfo | null>(null);
   const [pitch, setPitch] = useState(62);
@@ -273,6 +294,79 @@ export function Krakow3DMap() {
         });
       }
 
+      // Źródło i warstwy dla animowanych pędzących wiązek światła (Neon Pulses)
+      if (!mapInstance.getSource('commute-pulses-source')) {
+        mapInstance.addSource('commute-pulses-source', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+
+        mapInstance.addLayer({
+          id: 'commute-pulses-beam',
+          type: 'line',
+          source: 'commute-pulses-source',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-width': 5.5,
+            'line-color': '#ffffff',
+            'line-blur': 1,
+            'line-opacity': 0.95,
+          },
+        });
+      }
+
+      // Źródło i warstwy dla głowy impulsu (świecący orb na czele komety)
+      if (!mapInstance.getSource('commute-pulse-heads-source')) {
+        mapInstance.addSource('commute-pulse-heads-source', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+
+        mapInstance.addLayer({
+          id: 'commute-pulse-heads-glow',
+          type: 'circle',
+          source: 'commute-pulse-heads-source',
+          paint: {
+            'circle-radius': 10,
+            'circle-color': [
+              'match',
+              ['get', 'status'],
+              'optimal',
+              '#10b981',
+              'moderate',
+              '#f59e0b',
+              'heavy',
+              '#ef4444',
+              '#6366f1',
+            ],
+            'circle-blur': 0.7,
+            'circle-opacity': 0.8,
+          },
+        });
+
+        mapInstance.addLayer({
+          id: 'commute-pulse-heads-core',
+          type: 'circle',
+          source: 'commute-pulse-heads-source',
+          paint: {
+            'circle-radius': 4.5,
+            'circle-color': '#ffffff',
+            'circle-stroke-width': 2.5,
+            'circle-stroke-color': [
+              'match',
+              ['get', 'status'],
+              'optimal',
+              '#10b981',
+              'moderate',
+              '#f59e0b',
+              'heavy',
+              '#ef4444',
+              '#6366f1',
+            ],
+          },
+        });
+      }
+
       // Kursor pointer nad budynkami 3D
       const buildingLayerIds = ['building-3d', 'building'].filter((id) => mapInstance.getLayer(id));
 
@@ -418,12 +512,24 @@ export function Krakow3DMap() {
         travelMode
       );
       setCommuteAnalysis(analysis);
-      updateTrajectoriesLayer(map, analysis.routes);
+      routesRef.current = analysis.routes;
+      unfurlProgressRef.current = 0; // Wyzwala efekt wystrzelenia linii
+      animProgressRef.current = 0;
       updateDestinationMarkers(map, activeProfile.destinations, analysis.routes);
     } else {
       setCommuteAnalysis(null);
+      routesRef.current = [];
       updateTrajectoriesLayer(map, []);
       updateDestinationMarkers(map, activeProfile.destinations, []);
+
+      const clearSrc = (id: string) => {
+        const s = map.getSource(id);
+        if (s && s.type === 'geojson') {
+          (s as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+        }
+      };
+      clearSrc('commute-pulses-source');
+      clearSrc('commute-pulse-heads-source');
     }
   }, [
     selectedBuilding,
@@ -434,6 +540,103 @@ export function Krakow3DMap() {
     updateDestinationMarkers,
   ]);
 
+  // Ciągła pętla animacji 60 FPS dla pędzących wiązek światła i rozwijania linii
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
+    const map = mapRef.current;
+
+    const animate = () => {
+      const routes = routesRef.current;
+
+      if (routes.length > 0) {
+        // 1. Płynne rozwijanie trajektorii z budynku w pierwszych klatkach
+        if (unfurlProgressRef.current < 1) {
+          unfurlProgressRef.current = Math.min(1, unfurlProgressRef.current + 0.04);
+          const p = unfurlProgressRef.current;
+          const trajSource = map.getSource('commute-trajectories-source');
+          if (trajSource && trajSource.type === 'geojson') {
+            (trajSource as GeoJSONSource).setData({
+              type: 'FeatureCollection',
+              features: routes.map((r) => {
+                const total = r.trajectoryCoordinates.length;
+                const count = Math.max(2, Math.ceil(p * total));
+                return {
+                  type: 'Feature',
+                  properties: { status: r.status, duration: r.durationMinutes },
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: r.trajectoryCoordinates.slice(0, count),
+                  },
+                };
+              }),
+            });
+          }
+        }
+
+        // 2. Pędzące neonowe komety wzdłuż trajektorii (efekt WOW)
+        animProgressRef.current = (animProgressRef.current + 0.007) % 1;
+        const t = animProgressRef.current;
+
+        const pulseLines: PulseLineFeature[] = [];
+        const pulseHeads: PulseHeadFeature[] = [];
+
+        routes.forEach((r) => {
+          const coords = r.trajectoryCoordinates;
+          const total = coords.length;
+          if (total < 4) return;
+
+          const headIdx = Math.min(total - 1, Math.floor(t * (total - 1)));
+          const tailIdx = Math.max(0, headIdx - 8);
+
+          if (headIdx > tailIdx) {
+            pulseLines.push({
+              type: 'Feature',
+              properties: { status: r.status },
+              geometry: {
+                type: 'LineString',
+                coordinates: coords.slice(tailIdx, headIdx + 1),
+              },
+            });
+
+            pulseHeads.push({
+              type: 'Feature',
+              properties: { status: r.status },
+              geometry: {
+                type: 'Point',
+                coordinates: coords[headIdx],
+              },
+            });
+          }
+        });
+
+        const pulseSource = map.getSource('commute-pulses-source');
+        if (pulseSource && pulseSource.type === 'geojson') {
+          (pulseSource as GeoJSONSource).setData({
+            type: 'FeatureCollection',
+            features: pulseLines,
+          });
+        }
+
+        const headsSource = map.getSource('commute-pulse-heads-source');
+        if (headsSource && headsSource.type === 'geojson') {
+          (headsSource as GeoJSONSource).setData({
+            type: 'FeatureCollection',
+            features: pulseHeads,
+          });
+        }
+      }
+
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    };
+  }, [mapLoaded]);
   // Rotacja animowana 360°
   useEffect(() => {
     isRotatingRef.current = isRotating;
@@ -458,19 +661,24 @@ export function Krakow3DMap() {
   // Reset zaznaczenia
   const handleClearSelection = () => {
     setSelectedBuilding(null);
+    routesRef.current = [];
+    unfurlProgressRef.current = 0;
+    animProgressRef.current = 0;
     if (popupRef.current) {
       popupRef.current.remove();
       popupRef.current = null;
     }
     if (mapRef.current) {
-      const source = mapRef.current.getSource('selected-building-source');
-      if (source && source.type === 'geojson') {
-        const geoSource = source as GeoJSONSource;
-        geoSource.setData({
-          type: 'FeatureCollection',
-          features: [],
-        });
-      }
+      const clearSrc = (id: string) => {
+        const s = mapRef.current?.getSource(id);
+        if (s && s.type === 'geojson') {
+          (s as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+        }
+      };
+      clearSrc('selected-building-source');
+      clearSrc('commute-trajectories-source');
+      clearSrc('commute-pulses-source');
+      clearSrc('commute-pulse-heads-source');
     }
   };
 
