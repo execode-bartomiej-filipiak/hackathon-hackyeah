@@ -826,41 +826,77 @@ export function Krakow3DMap() {
           }
         }
 
-        // 2. Pędzące neonowe komety wzdłuż trajektorii (efekt WOW)
-        animProgressRef.current = (animProgressRef.current + 0.007) % 1;
-        const t = animProgressRef.current;
+        // 2. Pędzące neonowe komety w zsynchronizowanym rytmie pulsu (jednoczesny start i finisz)
+        animProgressRef.current = (animProgressRef.current + 0.0075) % 1;
+        const cycle = animProgressRef.current; // [0, 1)
 
         const pulseLines: PulseLineFeature[] = [];
         const pulseHeads: PulseHeadFeature[] = [];
 
-        routes.forEach((r) => {
-          const coords = r.trajectoryCoordinates;
-          const total = coords.length;
-          if (total < 4) return;
+        // Faza aktywnego pulsu trwa 76% cyklu, a pozostałe 24% to pauza/oddech pulsu
+        const ACTIVE_RATIO = 0.76;
 
-          const headIdx = Math.min(total - 1, Math.floor(t * (total - 1)));
-          const tailIdx = Math.max(0, headIdx - 8);
+        if (cycle < ACTIVE_RATIO) {
+          const norm = cycle / ACTIVE_RATIO; // [0, 1]
+          const pHead = Math.min(1, norm * 1.16);
+          const pTail = Math.max(0, (norm - 0.14) * 1.16);
 
-          if (headIdx > tailIdx) {
-            pulseLines.push({
-              type: 'Feature',
-              properties: { status: r.status },
-              geometry: {
-                type: 'LineString',
-                coordinates: coords.slice(tailIdx, headIdx + 1),
-              },
-            });
+          if (pTail < 1) {
+            routes.forEach((r) => {
+              const coords = r.trajectoryCoordinates;
+              const total = coords.length;
+              if (total < 2) return;
 
-            pulseHeads.push({
-              type: 'Feature',
-              properties: { status: r.status },
-              geometry: {
-                type: 'Point',
-                coordinates: coords[headIdx],
-              },
+              // Precyzyjna ciągła interpolacja pozycji czoła orba
+              const exactHead = pHead * (total - 1);
+              const iHead = Math.min(total - 2, Math.floor(exactHead));
+              const fHead = exactHead - iHead;
+              const headPt: [number, number] = [
+                coords[iHead][0] + (coords[iHead + 1][0] - coords[iHead][0]) * fHead,
+                coords[iHead][1] + (coords[iHead + 1][1] - coords[iHead][1]) * fHead,
+              ];
+
+              // Precyzyjna interpolacja pozycji ogona
+              const exactTail = pTail * (total - 1);
+              const iTail = Math.min(total - 2, Math.floor(exactTail));
+              const fTail = exactTail - iTail;
+              const tailPt: [number, number] = [
+                coords[iTail][0] + (coords[iTail + 1][0] - coords[iTail][0]) * fTail,
+                coords[iTail][1] + (coords[iTail + 1][1] - coords[iTail][1]) * fTail,
+              ];
+
+              // Składanie geometrii wiązki świetlnej
+              const beamCoords: Array<[number, number]> = [tailPt];
+              for (let i = iTail + 1; i <= iHead; i++) {
+                beamCoords.push(coords[i]);
+              }
+              beamCoords.push(headPt);
+
+              if (beamCoords.length >= 2) {
+                pulseLines.push({
+                  type: 'Feature',
+                  properties: { status: r.status },
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: beamCoords,
+                  },
+                });
+              }
+
+              // Orb na czele impulsu
+              if (pHead < 1 || pTail < 0.95) {
+                pulseHeads.push({
+                  type: 'Feature',
+                  properties: { status: r.status },
+                  geometry: {
+                    type: 'Point',
+                    coordinates: headPt,
+                  },
+                });
+              }
             });
           }
-        });
+        }
 
         const pulseSource = map.getSource('commute-pulses-source');
         if (pulseSource && pulseSource.type === 'geojson') {
