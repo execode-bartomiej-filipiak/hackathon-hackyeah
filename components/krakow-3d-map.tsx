@@ -448,7 +448,7 @@ export function Krakow3DMap() {
           type: 'fill-extrusion',
           source: 'selected-building-source',
           paint: {
-            'fill-extrusion-color': '#f59e0b',
+            'fill-extrusion-color': ['coalesce', ['get', 'color'], '#f59e0b'],
             'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 18],
             'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
             'fill-extrusion-opacity': 0.95,
@@ -1151,6 +1151,139 @@ export function Krakow3DMap() {
     isSwitchingBuildingRef.current = false;
   };
 
+  // Wyświetlenie podświetlenia budynku 3D oraz dymka informacyjnego
+  const showBuildingHighlightAndTooltip = (
+    map: Map,
+    building: SelectedBuildingInfo,
+    pointType: 'home' | 'reference'
+  ) => {
+    // 1. Bezpieczne usunięcie poprzedniego dymka
+    if (popupRef.current) {
+      isSwitchingBuildingRef.current = true;
+      popupRef.current.remove();
+      popupRef.current = null;
+      isSwitchingBuildingRef.current = false;
+    }
+
+    // 2. Utworzenie nowego dymka 3D
+    const labelMode = pointType === 'home' ? '🏠 Miejsce zamieszkania' : '🏢 Miejsce odniesienia';
+    const popupElement = document.createElement('div');
+    popupElement.className = 'p-1 text-slate-900 font-sans';
+    popupElement.innerHTML = `
+      <div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: #475569; margin-bottom: 2px;">
+        ${labelMode}
+      </div>
+      <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">${building.name}</div>
+      <div style="font-size: 11px; color: #475569;">
+        Dzielnica: <strong style="color: #0f172a;">${building.district}</strong>
+      </div>
+    `;
+
+    const newPopup = new maplibregl.Popup({
+      offset: [0, -12],
+      closeButton: true,
+      closeOnClick: false,
+      className: 'krakow-map-popup',
+    })
+      .setLngLat(building.coordinates)
+      .setDOMContent(popupElement)
+      .addTo(map);
+
+    newPopup.on('close', () => {
+      if (isSwitchingBuildingRef.current) return;
+      popupRef.current = null;
+    });
+
+    popupRef.current = newPopup;
+
+    // 3. Podświetlenie bryły budynku 3D z odpowiednim kolorem
+    const highlightColor = pointType === 'home' ? '#f59e0b' : '#3b82f6';
+
+    const updateGeometry = () => {
+      if (!mapRef.current) return;
+      const screenPoint = mapRef.current.project(building.coordinates);
+      const features = mapRef.current.queryRenderedFeatures(screenPoint);
+      let buildingFeature = features.find(
+        (f: MapGeoJSONFeature) =>
+          f.layer.id !== 'selected-building-highlight' &&
+          (f.layer.type === 'fill-extrusion' ||
+            f.sourceLayer === 'building' ||
+            f.layer.id.includes('building'))
+      );
+
+      if (!buildingFeature) {
+        const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
+          [screenPoint.x - 14, screenPoint.y - 14],
+          [screenPoint.x + 14, screenPoint.y + 14],
+        ];
+        const bboxFeatures = mapRef.current.queryRenderedFeatures(bbox);
+        buildingFeature = bboxFeatures.find(
+          (f: MapGeoJSONFeature) =>
+            f.layer.id !== 'selected-building-highlight' &&
+            (f.layer.type === 'fill-extrusion' ||
+              f.sourceLayer === 'building' ||
+              f.layer.id.includes('building'))
+        );
+      }
+
+      const source = mapRef.current.getSource('selected-building-source') as GeoJSONSource | undefined;
+      if (source && source.type === 'geojson') {
+        const height = building.height || 22;
+        if (buildingFeature && buildingFeature.geometry) {
+          source.setData({
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: {
+                  render_height: height + 0.5,
+                  height: height + 0.5,
+                  render_min_height: 0,
+                  min_height: 0,
+                  color: highlightColor,
+                },
+                geometry: extractClickedPolygon(buildingFeature.geometry, building.coordinates),
+              },
+            ],
+          });
+        } else {
+          const d = 0.00018;
+          const [lng, lat] = building.coordinates;
+          source.setData({
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: {
+                  render_height: height + 0.5,
+                  height: height + 0.5,
+                  render_min_height: 0,
+                  min_height: 0,
+                  color: highlightColor,
+                },
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [
+                    [
+                      [lng - d, lat - d],
+                      [lng + d, lat - d],
+                      [lng + d, lat + d],
+                      [lng - d, lat + d],
+                      [lng - d, lat - d],
+                    ],
+                  ],
+                },
+              },
+            ],
+          });
+        }
+      }
+    };
+
+    updateGeometry();
+    map.once('moveend', updateGeometry);
+  };
+
   // Przełączanie aktywnego punktu analizy i widoku (miejsce zamieszkania vs miejsce odniesienia)
   const handleSelectFocusPoint = (point: 'home' | 'reference') => {
     setActiveFocusPoint(point);
@@ -1161,8 +1294,11 @@ export function Krakow3DMap() {
 
     setSelectedBuilding(target);
 
-    // 1. Płynne wycentrowanie widoku 3D na wybranym miejscu
+    // 1. Podświetlenie budynku i pokazanie dymka / tooltipa
     if (mapRef.current) {
+      showBuildingHighlightAndTooltip(mapRef.current, target, point);
+
+      // 2. Płynne wycentrowanie widoku 3D na wybranym miejscu
       mapRef.current.flyTo({
         center: target.coordinates,
         zoom: 16.3,
@@ -1171,7 +1307,7 @@ export function Krakow3DMap() {
         essential: true,
       });
 
-      // 2. Natychmiastowa aktywacja zcache'owanych tras i KPI dla wybranego punktu (bez opóźnień)
+      // 3. Natychmiastowa aktywacja zcache'owanych tras i KPI dla wybranego punktu (bez opóźnień)
       const cached =
         point === 'home'
           ? cachedAnalysisRef.current.home
@@ -1257,46 +1393,15 @@ export function Krakow3DMap() {
     activeFocusPointRef.current = 'reference';
     cachedAnalysisRef.current = {};
 
-    // Podświetlenie w 3D obu demonstracyjnych lokalizacji
-    const source = mapRef.current.getSource('selected-building-source');
-    if (source && source.type === 'geojson') {
-      const geoSource = source as GeoJSONSource;
-      geoSource.setData({
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            properties: {
-              render_height: 22,
-              render_min_height: 0,
-            },
-            geometry: {
-              type: 'Point',
-              coordinates: demoHomeCoords,
-            },
-          },
-          {
-            type: 'Feature',
-            properties: {
-              render_height: 25,
-              render_min_height: 0,
-            },
-            geometry: {
-              type: 'Point',
-              coordinates: demoRefCoords,
-            },
-          },
-        ],
-      });
-    }
+    showBuildingHighlightAndTooltip(mapRef.current, demoRefBuilding, 'reference');
 
     mapRef.current.flyTo({
-      center: [19.9410, 50.0600], // perspektywa obejmująca oba punkty i dojazdy
-      zoom: 15.4,
-      pitch: 60,
-      bearing: -15,
+      center: demoRefCoords,
+      zoom: 16.3,
+      pitch: 62,
+      bearing: -20,
       essential: true,
-      duration: 1800,
+      duration: 1600,
     });
   };
   // Usuwanie zdefiniowanego celu
