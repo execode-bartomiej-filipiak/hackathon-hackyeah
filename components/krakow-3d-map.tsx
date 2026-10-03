@@ -14,13 +14,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { Button } from '@/components/ui/button';
 import {
   CompassIcon,
-  Maximize2Icon,
   RotateCwIcon,
-  Building2Icon,
-  MapPinIcon,
-  RulerIcon,
   InfoIcon,
-  XIcon,
 } from 'lucide-react';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import { calculateCommuteAnalysis } from '@/lib/commute';
@@ -813,81 +808,6 @@ export function Krakow3DMap() {
         onSelectDemoOrigin={handleSelectDemoOrigin}
       />
 
-      {/* PŁYWAJĄCA KARTA WYBRANEGO BUDYNKU 3D (LEWY DOLNY RÓG) */}
-      {selectedBuilding && (
-        <div className="absolute bottom-4 left-4 z-20 max-w-sm w-full bg-background/95 backdrop-blur-md p-4 rounded-2xl border border-primary/40 shadow-2xl space-y-3 animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="space-y-0.5 min-w-0">
-              <div className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-                <Building2Icon className="size-3.5" />
-                <span>Wybrany Budynek</span>
-              </div>
-              <h4 className="font-bold text-sm text-foreground truncate">
-                {selectedBuilding.name}
-              </h4>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearSelection}
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
-            >
-              <XIcon className="size-4" />
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-xl border border-border bg-muted/30 p-2.5 space-y-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
-                <RulerIcon className="size-3" /> Wysokość
-              </span>
-              <div className="font-bold text-sm text-foreground">
-                {selectedBuilding.height} m
-              </div>
-              <span className="text-[10px] text-muted-foreground">
-                ~{selectedBuilding.levels} kondygnacji
-              </span>
-            </div>
-
-            <div className="rounded-xl border border-border bg-muted/30 p-2.5 space-y-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
-                <MapPinIcon className="size-3" /> Dzielnica
-              </span>
-              <div className="font-bold text-xs text-foreground truncate">
-                {selectedBuilding.district}
-              </div>
-              <span className="text-[10px] text-muted-foreground truncate block">
-                {selectedBuilding.type}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-1">
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {selectedBuilding.coordinates[1].toFixed(5)}°N, {selectedBuilding.coordinates[0].toFixed(5)}°E
-            </span>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                if (mapRef.current) {
-                  mapRef.current.flyTo({
-                    center: selectedBuilding.coordinates,
-                    zoom: 17.5,
-                    pitch: 70,
-                    essential: true,
-                  });
-                }
-              }}
-              className="text-xs h-7 gap-1 font-medium"
-            >
-              <Maximize2Icon className="size-3" />
-              Skup kamerę
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* INSTRUKCJA DLA UŻYTKOWNIKA */}
       <div className="absolute bottom-3 right-3 z-10 pointer-events-none hidden sm:flex items-center gap-1.5 bg-background/85 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-border text-[11px] text-muted-foreground shadow-sm">
