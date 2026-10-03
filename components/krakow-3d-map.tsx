@@ -127,10 +127,76 @@ async function reverseGeocodeKrakow(
   };
 }
 
+// Izoluje pojedynczy obrys budynku z potencjalnego MultiPolygonu kafli wektorowych
+function extractClickedPolygon(
+  geometry: GeoJSON.Geometry,
+  clickPoint: [number, number]
+): GeoJSON.Geometry {
+  if (geometry.type !== 'MultiPolygon') {
+    return geometry;
+  }
+
+  const multiCoords = geometry.coordinates as Array<Array<Array<[number, number]>>>;
+  if (!multiCoords || multiCoords.length === 0) return geometry;
+
+  // 1. Sprawdzamy algorytmem ray-casting, który wielokąt obejmuje kliknięty punkt
+  const matched = multiCoords.find((poly) => {
+    const outerRing = poly[0];
+    if (!outerRing || outerRing.length < 3) return false;
+    const [x, y] = clickPoint;
+    let inside = false;
+    for (let i = 0, j = outerRing.length - 1; i < outerRing.length; j = i++) {
+      const xi = outerRing[i][0];
+      const yi = outerRing[i][1];
+      const xj = outerRing[j][0];
+      const yj = outerRing[j][1];
+      const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  });
+
+  if (matched) {
+    return {
+      type: 'Polygon',
+      coordinates: matched,
+    };
+  }
+
+  // 2. Jeśli punkt kliknięcia leżał na dachu/krawędzi (z powodu perspektywy kamery 3D),
+  // wybieramy wielokąt, którego środek (centroid) jest najbliższy punktowi kliknięcia
+  let nearestPoly = multiCoords[0];
+  let minDistance = Infinity;
+
+  for (const poly of multiCoords) {
+    const outerRing = poly[0];
+    if (!outerRing || outerRing.length === 0) continue;
+    let sumX = 0;
+    let sumY = 0;
+    for (const pt of outerRing) {
+      sumX += pt[0];
+      sumY += pt[1];
+    }
+    const cX = sumX / outerRing.length;
+    const cY = sumY / outerRing.length;
+    const dist = Math.hypot(cX - clickPoint[0], cY - clickPoint[1]);
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearestPoly = poly;
+    }
+  }
+
+  return {
+    type: 'Polygon',
+    coordinates: nearestPoly,
+  };
+}
+
 export function Krakow3DMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const popupRef = useRef<Popup | null>(null);
+  const isSwitchingBuildingRef = useRef(false);
   const isRotatingRef = useRef(false);
   const destinationMarkersRef = useRef<maplibregl.Marker[]>([]);
   const routesRef = useRef<CommuteRouteResult[]>([]);
@@ -518,9 +584,10 @@ export function Krakow3DMap() {
 
         const buildingFeature: MapGeoJSONFeature | undefined = features.find(
           (f: MapGeoJSONFeature) =>
-            f.layer.type === 'fill-extrusion' ||
-            f.sourceLayer === 'building' ||
-            f.layer.id.includes('building')
+            f.layer.id !== 'selected-building-highlight' &&
+            (f.layer.type === 'fill-extrusion' ||
+              f.sourceLayer === 'building' ||
+              f.layer.id.includes('building'))
         );
 
         if (buildingFeature) {
@@ -563,15 +630,21 @@ export function Krakow3DMap() {
                     render_min_height: 0,
                     min_height: 0,
                   },
-                  geometry: buildingFeature.geometry,
+                  geometry: extractClickedPolygon(buildingFeature.geometry, [
+                    e.lngLat.lng,
+                    e.lngLat.lat,
+                  ]),
                 },
               ],
             });
           }
 
-          // Tooltip 3D na mapie
+          // Tooltip 3D na mapie - bezpieczne usunięcie poprzedniego dymka bez resetu stanu
           if (popupRef.current) {
+            isSwitchingBuildingRef.current = true;
             popupRef.current.remove();
+            popupRef.current = null;
+            isSwitchingBuildingRef.current = false;
           }
 
           const popupElement = document.createElement('div');
@@ -585,7 +658,7 @@ export function Krakow3DMap() {
             </div>
           `;
 
-          popupRef.current = new maplibregl.Popup({
+          const newPopup = new maplibregl.Popup({
             offset: [0, -12],
             closeButton: true,
             closeOnClick: false,
@@ -595,9 +668,12 @@ export function Krakow3DMap() {
             .setDOMContent(popupElement)
             .addTo(mapInstance);
 
-          popupRef.current.on('close', () => {
+          newPopup.on('close', () => {
+            if (isSwitchingBuildingRef.current) return;
             handleClearSelection();
           });
+
+          popupRef.current = newPopup;
 
           // Wyszukiwanie rzeczywistej nazwy ulicy i numeru budynku
           const currentLng = e.lngLat.lng;
@@ -801,6 +877,8 @@ export function Krakow3DMap() {
 
   // Reset zaznaczenia
   const handleClearSelection = () => {
+    if (isSwitchingBuildingRef.current) return;
+    isSwitchingBuildingRef.current = true;
     setSelectedBuilding(null);
     routesRef.current = [];
     unfurlProgressRef.current = 0;
@@ -821,6 +899,7 @@ export function Krakow3DMap() {
       clearSrc('commute-pulses-source');
       clearSrc('commute-pulse-heads-source');
     }
+    isSwitchingBuildingRef.current = false;
   };
 
   // Fokus na trasie do wybranego celu z panelu HUD
@@ -838,12 +917,18 @@ export function Krakow3DMap() {
       duration: 1600,
       essential: true,
     });
-
   };
 
   // Prezentacyjny przycisk wyboru budynku na scenie
   const handleSelectDemoOrigin = () => {
     if (!mapRef.current) return;
+
+    if (popupRef.current) {
+      isSwitchingBuildingRef.current = true;
+      popupRef.current.remove();
+      popupRef.current = null;
+      isSwitchingBuildingRef.current = false;
+    }
 
     const demoCoords: [number, number] = [19.9373, 50.0617];
     const demoBuilding: SelectedBuildingInfo = {
