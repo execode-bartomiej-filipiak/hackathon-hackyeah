@@ -22,7 +22,6 @@ import {
   InfoIcon,
   XIcon,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import { calculateCommuteAnalysis } from '@/lib/commute';
 import { CommuteHud } from '@/components/commute-hud';
@@ -480,9 +479,6 @@ export function Krakow3DMap() {
             .setDOMContent(popupElement)
             .addTo(mapInstance);
 
-          toast.info(`Zaznaczono obiekt: ${name}`, {
-            description: `Wyliczono czasy dojazdów dla: ${activeProfile.name}`,
-          });
         }
       });
 
@@ -698,9 +694,6 @@ export function Krakow3DMap() {
       essential: true,
     });
 
-    toast.info(`Trasa do: ${route.destinationName}`, {
-      description: `Czas: ${route.durationMinutes} min (${route.distanceKm} km)`,
-    });
   };
 
   // Prezentacyjny przycisk wyboru budynku na scenie
@@ -750,7 +743,6 @@ export function Krakow3DMap() {
       duration: 1800,
     });
 
-    toast.success('Wybrano lokalizację demonstracyjną: Rynek Główny');
   };
 
   return (

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import './globals.css';
 
@@ -34,7 +33,6 @@ export default function RootLayout({
           <div className="flex min-h-screen flex-col">
             <main className="flex-1">{children}</main>
           </div>
-          <Toaster richColors position="top-right" theme="light" closeButton />
         </TooltipProvider>
       </body>
     </html>
