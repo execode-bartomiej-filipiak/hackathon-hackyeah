@@ -138,9 +138,9 @@ export function AnalyticsDetailsDialog({
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             {homeBuildingName
-              ? `Analiza dla lokalizacji: ${homeBuildingName}`
+              ? `Obecne miejsce zamieszkania: ${homeBuildingName}`
               : 'Zestawienie czasowe, środowiskowe i transportowe dla wybranego punktu w Krakowie.'}
-            {referenceBuildingName && ` • Punkt odniesienia: ${referenceBuildingName}`}
+            {referenceBuildingName && ` • Nowe miejsce zamieszkania: ${referenceBuildingName}`}
           </DialogDescription>
         </DialogHeader>
 

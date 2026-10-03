@@ -1619,7 +1619,7 @@ export function Krakow3DMap() {
         </div>
       )}
 
-      {/* PŁYWAJĄCY BANER WYBORU MIEJSCA ODNIESIENIA */}
+      {/* PŁYWAJĄCY BANER WYBORU NOWEGO MIEJSCA ZAMIESZKANIA */}
       {isSelectingReference && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-blue-600 text-white px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-3">
           <Building2Icon className="size-4 animate-bounce" />

@@ -479,7 +479,7 @@ export function CommuteHud({
                 </div>
               </button>
 
-              {/* 2. OBECNE MIEJSCE ZAMIESZKANIA I ODNIESIENIA W TRYBIE ANALIZY */}
+              {/* 2. OBECNE I NOWE MIEJSCE ZAMIESZKANIA W TRYBIE ANALIZY */}
               {(effectiveHomeName || effectiveRefName) && (
                 <div className="space-y-1.5 pt-1 border-t border-border/40">
                   {effectiveHomeName && (
