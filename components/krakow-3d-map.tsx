@@ -1115,11 +1115,11 @@ export function Krakow3DMap() {
           size="sm"
           onClick={handleCenterOnSelectedBuilding}
           disabled={!selectedBuilding}
-          className="text-xs h-7 px-2.5 gap-1.5 font-medium disabled:opacity-50"
+          className="size-7 p-0 disabled:opacity-50"
           title={selectedBuilding ? `Wycentruj na: ${selectedBuilding.name}` : 'Wybierz budynek na mapie, aby wycentrować'}
+          aria-label="Centruj na wybranym punkcie"
         >
           <LocateFixedIcon className="size-3.5 text-primary" />
-          <span>Centruj punkt</span>
         </Button>
 
         <Button
