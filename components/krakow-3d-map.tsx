@@ -11,14 +11,7 @@ import type {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Button } from '@/components/ui/button';
-import {
-  RotateCwIcon,
-  InfoIcon,
-  CrosshairIcon,
-  LocateFixedIcon,
-  HomeIcon,
-  Building2Icon,
-} from 'lucide-react';
+import { RotateCwIcon, InfoIcon, LocateFixedIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import {
@@ -172,6 +165,115 @@ const DESTINATION_PIN_STYLES: Record<
   },
 };
 
+// Tryby wyboru punktu na mapie — jeden zestaw stylów, jedna animacja dla wszystkich
+const SELECTION_MODES = {
+  target: {
+    label: 'Kliknij punkt lub budynek',
+    ring: 'border-rose-400',
+    line: 'bg-rose-400',
+    dot: 'bg-rose-400',
+    pill: 'bg-rose-600',
+    glow: 'ring-rose-500/40',
+    vignette: 'ring-rose-500/25',
+  },
+  home: {
+    label: 'Kliknij budynek mieszkalny',
+    ring: 'border-amber-400',
+    line: 'bg-amber-400',
+    dot: 'bg-amber-400',
+    pill: 'bg-amber-600',
+    glow: 'ring-amber-500/40',
+    vignette: 'ring-amber-500/25',
+  },
+  reference: {
+    label: 'Kliknij budynek na mapie',
+    ring: 'border-blue-400',
+    line: 'bg-blue-400',
+    dot: 'bg-blue-400',
+    pill: 'bg-blue-600',
+    glow: 'ring-blue-500/40',
+    vignette: 'ring-blue-500/25',
+  },
+} as const;
+
+type SelectionModeId = keyof typeof SELECTION_MODES;
+
+// Celownik podążający za kursorem — animowany wskaźnik aktywnego trybu wyboru
+function SelectionReticle({
+  reticleRef,
+  mode,
+}: {
+  reticleRef: React.RefObject<HTMLDivElement | null>;
+  mode: SelectionModeId | null;
+}) {
+  const config = mode ? SELECTION_MODES[mode] : null;
+  return (
+    <div
+      ref={reticleRef}
+      className="pointer-events-none absolute left-0 top-0 z-30 opacity-0 transition-opacity duration-150 will-change-transform"
+    >
+      {config && (
+        <div className="relative -translate-x-1/2 -translate-y-1/2">
+          {/* Rozchodzące się pierścienie */}
+          <span
+            className={`absolute left-1/2 top-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border ${config.ring} animate-ping`}
+          />
+          <span
+            className={`absolute left-1/2 top-1/2 size-10 -translate-x-1/2 -translate-y-1/2 rounded-full border ${config.ring} opacity-70 animate-pulse`}
+          />
+          {/* Środek celownika */}
+          <span
+            className={`relative flex size-8 items-center justify-center rounded-full border-2 ${config.ring} bg-slate-950/40 backdrop-blur-[1px]`}
+          >
+            <span className={`absolute h-px w-3 ${config.line}`} />
+            <span className={`absolute h-3 w-px ${config.line}`} />
+            <span className={`size-1.5 rounded-full ${config.dot}`} />
+          </span>
+          {/* Etykieta trybu */}
+          <span
+            className={`absolute left-1/2 top-7 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-white shadow-lg ${config.pill}`}
+          >
+            {config.label}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Dolna pigułka trybu — informuje o aktywnym trybie i pozwala go anulować
+function SelectionModePill({
+  mode,
+  onCancel,
+}: {
+  mode: SelectionModeId;
+  onCancel: () => void;
+}) {
+  const config = SELECTION_MODES[mode];
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-6 z-30 flex justify-center px-4">
+      <div
+        className={`pointer-events-auto flex items-center gap-3 rounded-full ${config.pill} px-4 py-2 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-4`}
+      >
+        <span className={`relative size-2.5 shrink-0 rounded-full ring-2 ${config.glow}`}>
+          <span className="absolute inline-flex size-full rounded-full bg-white opacity-75 animate-ping" />
+          <span className="relative inline-flex size-2.5 rounded-full bg-white" />
+        </span>
+        <span className="text-xs font-semibold whitespace-nowrap">{config.label}</span>
+        <span className="text-[10px] text-white/70 hidden sm:inline">Esc anuluje</span>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={onCancel}
+          className="h-6 px-2 text-[11px] bg-white/95 text-slate-900 hover:bg-white font-medium"
+        >
+          Anuluj
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function getDistrict(lng: number, lat: number): string {
   const distRynek = Math.hypot(lng - 19.9373, lat - 50.0617);
   const distWawel = Math.hypot(lng - 19.9354, lat - 50.0540);
@@ -319,6 +421,7 @@ export function Krakow3DMap() {
   const animProgressRef = useRef(0);
   const animFrameRef = useRef<number | null>(null);
   const arcsCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const reticleRef = useRef<HTMLDivElement | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuildingInfo | null>(null);
   const [homeBuilding, setHomeBuilding] = useState<SelectedBuildingInfo | null>(null);
@@ -578,6 +681,7 @@ export function Krakow3DMap() {
         }
 
         const features = mapInstance.queryRenderedFeatures(e.point);
+
         const hasBuilding = features.some(
           (f: MapGeoJSONFeature) =>
             f.layer.id !== 'selected-building-highlight' &&
@@ -1523,6 +1627,69 @@ export function Krakow3DMap() {
 
 
   // Przekierowanie mapy i wskazanie punktu z wyszukiwarki adresów
+  // Aktualnie aktywny tryb wyboru punktu na mapie (jedna animacja dla wszystkich trybów)
+  const activeSelectionMode: SelectionModeId | null = isAddingTarget
+    ? 'target'
+    : isSelectingHome
+      ? 'home'
+      : isSelectingReference
+        ? 'reference'
+        : null;
+
+  // Celownik trybu wyboru — śledzi kursor bezpośrednio w DOM (bez re-renderów przy każdym ruchu)
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) return;
+
+    const hideReticle = () => {
+      if (reticleRef.current) {
+        reticleRef.current.style.opacity = '0';
+      }
+    };
+
+    const moveReticle = (event: MouseEvent) => {
+      const reticle = reticleRef.current;
+      if (!reticle) return;
+
+      // Celownik pokazujemy tylko nad samą mapą (HUD jest poza kontenerem mapy)
+      const hovered = document.elementFromPoint(event.clientX, event.clientY);
+      if (!hovered || !container.contains(hovered)) {
+        hideReticle();
+        return;
+      }
+
+      const bounds = container.getBoundingClientRect();
+      reticle.style.opacity = '1';
+      reticle.style.transform = `translate(${event.clientX - bounds.left}px, ${
+        event.clientY - bounds.top
+      }px)`;
+    };
+
+    if (activeSelectionMode) {
+      window.addEventListener('mousemove', moveReticle);
+      window.addEventListener('blur', hideReticle);
+    } else {
+      hideReticle();
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', moveReticle);
+      window.removeEventListener('blur', hideReticle);
+    };
+  }, [activeSelectionMode]);
+
+  const cancelSelectionMode = () => {
+    setIsAddingTarget(false);
+    setIsSelectingHome(false);
+    setIsSelectingReference(false);
+    isAddingTargetRef.current = false;
+    isSelectingHomeRef.current = false;
+    isSelectingReferenceRef.current = false;
+    if (reticleRef.current) {
+      reticleRef.current.style.opacity = '0';
+    }
+  };
+
   const handleSelectSearchResult = (item: SearchResultItem) => {
     if (!mapRef.current) return;
 
@@ -1577,64 +1744,24 @@ export function Krakow3DMap() {
         }}
       />
 
-      {/* NAKŁADKA CANVAS: ŁUKI 3D WZNOSZĄCE SIĘ NAD MIASTEM */}
-      <canvas
-        ref={arcsCanvasRef}
-        className="absolute inset-0 z-[5] w-full h-full pointer-events-none"
-      />
+      {/* NAKŁADKA TRYBU WYBORU: winieta + łuki 3D + celownik za kursorem */}
+      <div className="pointer-events-none absolute inset-0 z-20">
+        {/* Delikatna, pulsująca ramka sygnalizująca aktywny tryb */}
+        <div
+          className={`absolute inset-0 ring-4 ring-inset transition-opacity duration-300 ${
+            activeSelectionMode ? SELECTION_MODES[activeSelectionMode].vignette : ''
+          } ${activeSelectionMode ? 'opacity-100 animate-pulse' : 'opacity-0'}`}
+        />
+        <canvas
+          ref={arcsCanvasRef}
+          className="absolute inset-0 h-full w-full pointer-events-none"
+        />
+        <SelectionReticle reticleRef={reticleRef} mode={activeSelectionMode} />
+      </div>
 
-      {/* PŁYWAJĄCY BANER CELOWNIKA */}
-      {isAddingTarget && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-rose-600 text-white px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-3">
-          <CrosshairIcon className="size-4 animate-spin" />
-          <span className="text-xs font-semibold">
-            Tryb wyboru celu: Kliknij dowolny punkt lub budynek na mapie
-          </span>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => setIsAddingTarget(false)}
-            className="h-6 px-2 text-[11px] bg-white text-rose-700 hover:bg-white/90 font-medium"
-          >
-            Anuluj (Esc)
-          </Button>
-        </div>
-      )}
-
-      {/* PŁYWAJĄCY BANER WYBORU OBECNEGO MIEJSCA ZAMIESZKANIA */}
-      {isSelectingHome && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-amber-600 text-white px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-3">
-          <HomeIcon className="size-4 animate-bounce" />
-          <span className="text-xs font-semibold">
-            Tryb wyboru obecnego miejsca zamieszkania: Kliknij dowolny budynek 3D na mapie
-          </span>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => setIsSelectingHome(false)}
-            className="h-6 px-2 text-[11px] bg-white text-amber-900 hover:bg-white/90 font-medium"
-          >
-            Anuluj (Esc)
-          </Button>
-        </div>
-      )}
-
-      {/* PŁYWAJĄCY BANER WYBORU NOWEGO MIEJSCA ZAMIESZKANIA */}
-      {isSelectingReference && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-blue-600 text-white px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-3">
-          <Building2Icon className="size-4 animate-bounce" />
-          <span className="text-xs font-semibold">
-            Tryb wyboru nowego miejsca zamieszkania: Kliknij budynek 3D na mapie
-          </span>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => setIsSelectingReference(false)}
-            className="h-6 px-2 text-[11px] bg-white text-blue-900 hover:bg-white/90 font-medium"
-          >
-            Anuluj (Esc)
-          </Button>
-        </div>
+      {/* DOLNA PIGUŁKA TRYBU WYBORU */}
+      {activeSelectionMode && (
+        <SelectionModePill mode={activeSelectionMode} onCancel={cancelSelectionMode} />
       )}
 
       {/* STAN ŁADOWANIA */}
