@@ -23,9 +23,11 @@ import { SAMPLE_INPUTS } from '@/mock/demo-data';
 interface RecordsPreviewProps {
   initialRecords: RecordItem[];
   source: 'db' | 'mock';
+  latencyMs?: number;
+  projectHost?: string;
 }
 
-export function RecordsPreview({ initialRecords, source }: RecordsPreviewProps) {
+export function RecordsPreview({ initialRecords, source, latencyMs, projectHost }: RecordsPreviewProps) {
   const [records, setRecords] = useState<RecordItem[]>(initialRecords);
   const [isPending, startTransition] = useTransition();
 
@@ -82,8 +84,18 @@ export function RecordsPreview({ initialRecords, source }: RecordsPreviewProps) 
                 Tabela Supabase: <code className="font-mono text-primary font-semibold">public.records</code>
               </CardTitle>
             </div>
-            <CardDescription className="text-xs">
-              Dane zsynchronizowane między bazą PostgreSQL w Supabase a aplikacją na Vercelu.
+            <CardDescription className="text-xs flex flex-wrap items-center gap-2 pt-0.5">
+              <span>Dane zsynchronizowane z PostgreSQL w chmurze Supabase.</span>
+              {projectHost && (
+                <span className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">
+                  host: {projectHost}
+                </span>
+              )}
+              {typeof latencyMs === 'number' && (
+                <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                  (czas zapytania: {latencyMs} ms)
+                </span>
+              )}
             </CardDescription>
           </div>
 

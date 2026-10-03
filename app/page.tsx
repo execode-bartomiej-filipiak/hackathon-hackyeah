@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { isDemoMode } from '@/lib/demo';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { HackathonLaunchpad } from '@/components/hackathon-launchpad';
@@ -8,7 +11,7 @@ import { Code2Icon } from 'lucide-react';
 export default async function HomePage() {
   const isDemo = await isDemoMode();
   const supabaseConfigured = isSupabaseConfigured();
-  const { data: records, source } = await getRecords();
+  const { data: records, source, latencyMs, projectHost } = await getRecords();
   return (
     <div className="min-h-screen bg-muted/20">
       {/* GŁÓWNY NAGŁÓWEK */}
@@ -36,6 +39,8 @@ export default async function HomePage() {
           <RecordsPreview
             initialRecords={records}
             source={source}
+            latencyMs={latencyMs}
+            projectHost={projectHost}
           />
           <HackathonLaunchpad
             isDemo={isDemo}
