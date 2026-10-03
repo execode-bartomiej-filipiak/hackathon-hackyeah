@@ -346,14 +346,14 @@ export function Krakow3DMap() {
             : route?.status === 'heavy'
             ? 'bg-rose-600 text-white'
             : 'bg-primary text-primary-foreground';
-
+        el.title = `${dest.name}${route ? ` (${route.durationMinutes} min)` : ''}`;
         el.innerHTML = `
-          <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-xl border border-white/40 backdrop-blur-md ${statusBg} text-xs font-semibold transition-transform group-hover:scale-105">
-            <span class="text-sm">${dest.icon}</span>
-            <span class="truncate max-w-[110px] hidden sm:inline">${dest.name.split(' ')[0]}</span>
+          <div class="flex items-center gap-1.5 px-3 py-1 rounded-full shadow-xl border border-white/40 backdrop-blur-md ${statusBg} text-xs font-semibold transition-transform group-hover:scale-105 whitespace-nowrap">
+            <span class="text-sm shrink-0">${dest.icon}</span>
+            <span class="max-w-[200px] sm:max-w-[280px] truncate">${dest.name}</span>
             ${
               route
-                ? `<span class="bg-black/35 px-1.5 py-0.5 rounded-full text-[10px] font-bold tracking-tight">${route.durationMinutes}m</span>`
+                ? `<span class="bg-black/35 px-1.5 py-0.5 rounded-full text-[10px] font-bold tracking-tight shrink-0">${route.durationMinutes}m</span>`
                 : ''
             }
           </div>
