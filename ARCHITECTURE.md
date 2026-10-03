@@ -126,3 +126,29 @@ export async function getData() {
   grant all on public.records to anon;
   ```
 - Dane początkowe wgrywane są przez `supabase/seed.sql` za pomocą `on conflict (id) do nothing`, co pozwala na wielokrotne uruchamianie bez duplikacji.
+
+---
+
+## 6. Workflow Git i Wdrażanie na Żądanie (Vercel)
+
+W projekcie obowiązuje dwugałęziowy model pracy:
+
+1. **Branch `dev` (Rozwój i Integracja Zespołu)**:
+   - Cały bieżący development obu programistów i agenta Antigravity odbywa się na gałęzi `dev`.
+   - Vercel ma aktywną regułę **Ignored Build Step**:
+     ```bash
+     if [ "$VERCEL_GIT_COMMIT_REF" = "main" ]; then exit 1; else exit 0; fi
+     ```
+   - Każdy push do `dev` jest przez Vercel automatycznie ignorowany — brak zbędnych deploymentów i zużywania limitów konta.
+
+2. **Branch `main` (Produkcyjne Demo dla Jury)**:
+   - Odzwierciedla działającą, przetestowaną wersję demonstracyjną na [hackathon-hackyeah.vercel.app](https://hackathon-hackyeah.vercel.app).
+   - Scalenie z `dev` następuje **wyłącznie na wyraźne żądanie programistów**.
+   - Procedura publikacji nowej wersji demo:
+     ```bash
+     npm run typecheck && npm run build
+     git checkout main
+     git merge dev
+     git push origin main
+     git checkout dev
+     ```

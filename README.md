@@ -51,6 +51,26 @@ npm run build       # Build produkcyjny Next.js
    cp .env.example .env.local
    ```
 
+
+---
+
+## 🌿 Workflow Git & Wdrażanie na Żądanie (Vercel)
+
+W projekcie pracujemy zespołowo na dwóch gałęziach:
+
+1. **`dev` (Rozwój bieżący)**:
+   - Cały development i commity (Twoje, kolegi oraz agenta AI) trafiają na branch `dev`.
+   - Vercel **nie buduje** zmian wypychanych do `dev` (skonfigurowany `Ignored Build Step`), oszczędzając limity konta i czas.
+2. **`main` (Środowisko Produkcyjne Demo)**:
+   - Vercel odpala build **wyłącznie** po scaleniu do `main`.
+   - Gdy chcecie zaktualizować wersję na żywo dla jury:
+     ```bash
+     npm run typecheck && npm run build
+     git checkout main
+     git merge dev
+     git push origin main
+     git checkout dev
+     ```
 ---
 
 ## 📚 Dokumentacja i Wytyczne dla Agenta

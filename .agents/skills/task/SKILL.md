@@ -29,3 +29,8 @@ Gdy zadanie jest gotowe do zintegrowania:
 ```bash
 npm run build
 ```
+
+## 4. Faza Publikacji (Git & Vercel)
+1. Zmiany commituj i pushuj **wyłącznie na branchu `dev`**.
+2. Na branch `main` (uruchamiający deployment Vercel) merguj wyłącznie na wyraźne żądanie programistów.
+```

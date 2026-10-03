@@ -81,6 +81,16 @@ Przed dotknięciem jakiegokolwiek pliku kodu wykonaj:
 - Teksty interfejsu (UI, etykiety, toasty, komunikaty dla jury): **język polski**.
 - Pliki: `kebab-case.ts/tsx`. Komponenty: `PascalCase`.
 
+
+### I. Git & Deployment Workflow (Branch `dev` vs `main`)
+- **ZAKAZ pracy bezpośrednio na branchu `main`**. Cały bieżący development, zadania i commity trafiają na branch **`dev`**.
+- Vercel ma skonfigurowany **Ignored Build Step**: buduje **WYŁĄCZNIE** pushe na branch `main`. Commity na `dev` są ignorowane i nie zużywają limitów buildów.
+- Agent **NIGDY** nie merguje ani nie pushuje do `main` samowolnie — scalenie do `main` następuje **wyłącznie na wyraźne żądanie użytkownika**.
+- Procedura aktualizacji wersji produkcyjnej (tylko na żądanie użytkownika):
+  ```bash
+  npm run typecheck && npm run build
+  git checkout main && git merge dev && git push origin main && git checkout dev
+  ```
 ---
 
 ## 4. Weryfikacja Jakości Przed Zakończeniem Zadania
