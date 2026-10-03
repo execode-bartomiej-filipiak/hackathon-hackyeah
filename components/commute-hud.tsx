@@ -167,15 +167,15 @@ export function CommuteHud({
           {/* JEŚLI BRAK WYBRANEGO BUDYNKU / PRZED PEŁNĄ ANALIZĄ */}
           {!analysis ? (
             <div className="space-y-3">
-              {/* 1. PIERWSZE MIEJSCE: MIEJSCE ZAMIESZKANIA */}
+              {/* 1. PIERWSZE MIEJSCE: OBECNE MIEJSCE ZAMIESZKANIA */}
               <div className="space-y-1.5">
                 <span className="text-[11px] text-muted-foreground font-semibold px-0.5 block">
-                  Miejsce zamieszkania:
+                  Obecne miejsce zamieszkania:
                 </span>
                 {effectiveHomeName ? (
                   <div
                     onClick={() => onSelectFocusPoint?.('home')}
-                    title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla miejsca zamieszkania"
+                    title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla obecnego miejsca zamieszkania"
                     className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
                       activeFocusPoint === 'home'
                         ? 'border-primary ring-2 ring-primary/40 bg-primary/10 shadow-xs'
@@ -189,7 +189,7 @@ export function CommuteHud({
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                            Miejsce zamieszkania
+                            Obecne miejsce zamieszkania
                           </span>
                           {activeFocusPoint === 'home' && (
                             <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[8px] font-bold leading-none">
@@ -234,21 +234,21 @@ export function CommuteHud({
                     <span>
                       {isSelectingHome || isSelectingOrigin
                         ? 'Wskaż budynek na mapie...'
-                        : '+ Wskaż miejsce zamieszkania'}
+                        : '+ Wskaż obecne miejsce zamieszkania'}
                     </span>
                   </Button>
                 )}
               </div>
 
-              {/* 2. DRUGIE MIEJSCE: MIEJSCE ODNIESIENIA */}
+              {/* 2. DRUGIE MIEJSCE: NOWE MIEJSCE ZAMIESZKANIA */}
               <div className="space-y-1.5 pt-1 border-t border-border/40">
                 <span className="text-[11px] text-muted-foreground font-semibold px-0.5 block">
-                  Miejsce odniesienia:
+                  Nowe miejsce zamieszkania:
                 </span>
                 {effectiveRefName ? (
                   <div
                     onClick={() => onSelectFocusPoint?.('reference')}
-                    title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla miejsca odniesienia"
+                    title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla nowego miejsca zamieszkania"
                     className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
                       activeFocusPoint === 'reference'
                         ? 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-500/10 shadow-xs'
@@ -262,7 +262,7 @@ export function CommuteHud({
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                            Miejsce odniesienia
+                            Nowe miejsce zamieszkania
                           </span>
                           {activeFocusPoint === 'reference' && (
                             <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-500 text-[8px] font-bold leading-none">
@@ -307,7 +307,7 @@ export function CommuteHud({
                     <span>
                       {isSelectingReference
                         ? 'Wskaż budynek na mapie...'
-                        : '+ Wskaż miejsce odniesienia'}
+                        : '+ Wskaż nowe miejsce zamieszkania'}
                     </span>
                   </Button>
                 )}
@@ -479,13 +479,13 @@ export function CommuteHud({
                 </div>
               </button>
 
-              {/* 2. MIEJSCE ZAMIESZKANIA I ODNIESIENIA W TRYBIE ANALIZY */}
+              {/* 2. OBECNE MIEJSCE ZAMIESZKANIA I ODNIESIENIA W TRYBIE ANALIZY */}
               {(effectiveHomeName || effectiveRefName) && (
                 <div className="space-y-1.5 pt-1 border-t border-border/40">
                   {effectiveHomeName && (
                     <div
                       onClick={() => onSelectFocusPoint?.('home')}
-                      title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla miejsca zamieszkania"
+                      title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla obecnego miejsca zamieszkania"
                       className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
                         activeFocusPoint === 'home'
                           ? 'border-primary ring-2 ring-primary/40 bg-primary/10 shadow-xs'
@@ -497,7 +497,7 @@ export function CommuteHud({
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[9px] uppercase font-bold text-muted-foreground block leading-none">
-                              Miejsce zamieszkania
+                              Obecne miejsce zamieszkania
                             </span>
                             {activeFocusPoint === 'home' && (
                               <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[8px] font-bold leading-none">
@@ -529,7 +529,7 @@ export function CommuteHud({
                   {effectiveRefName && (
                     <div
                       onClick={() => onSelectFocusPoint?.('reference')}
-                      title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla miejsca odniesienia"
+                      title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla nowego miejsca zamieszkania"
                       className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
                         activeFocusPoint === 'reference'
                           ? 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-500/10 shadow-xs'
@@ -541,7 +541,7 @@ export function CommuteHud({
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[9px] uppercase font-bold text-muted-foreground block leading-none">
-                              Miejsce odniesienia
+                              Nowe miejsce zamieszkania
                             </span>
                             {activeFocusPoint === 'reference' && (
                               <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-500 text-[8px] font-bold leading-none">

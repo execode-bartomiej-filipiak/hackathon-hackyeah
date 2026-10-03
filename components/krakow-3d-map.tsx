@@ -622,7 +622,7 @@ export function Krakow3DMap() {
           return;
         }
 
-        // Tryb wyboru budynku / miejsca zamieszkania / miejsca odniesienia
+        // Tryb wyboru budynku / obecnego miejsca zamieszkania / nowego miejsca zamieszkania
         const isHomeMode = isSelectingHomeRef.current;
         const isRefMode = isSelectingReferenceRef.current;
 
@@ -1153,7 +1153,7 @@ export function Krakow3DMap() {
           ping: 'border-blue-400 bg-blue-400/25',
           core: 'bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.9)]',
         };
-    const typeLabel = isHome ? 'Miejsce zamieszkania' : 'Miejsce odniesienia';
+    const typeLabel = isHome ? 'Obecne miejsce zamieszkania' : 'Nowe miejsce zamieszkania';
     const typeEmoji = isHome ? '🏠' : '🏢';
 
     const indicatorEl = document.createElement('div');
@@ -1306,7 +1306,7 @@ export function Krakow3DMap() {
     map.once('moveend', updateGeometry);
   };
 
-  // Przełączanie aktywnego punktu analizy i widoku (miejsce zamieszkania vs miejsce odniesienia)
+  // Przełączanie aktywnego punktu analizy i widoku (obecne miejsce zamieszkania vs nowe miejsce zamieszkania)
   const handleSelectFocusPoint = (point: 'home' | 'reference') => {
     setActiveFocusPoint(point);
     activeFocusPointRef.current = point;
@@ -1389,7 +1389,7 @@ export function Krakow3DMap() {
     });
   };
 
-  // Wczytanie gotowego scenariusza demonstracyjnego (para: miejsce zamieszkania + lokalizacja oceniana)
+  // Wczytanie gotowego scenariusza demonstracyjnego (para: obecne miejsce zamieszkania + lokalizacja oceniana)
   const handleSelectPreset = (profileId: string) => {
     const map = mapRef.current;
     const scenario = DEMO_PRESET_SCENARIOS[profileId];
@@ -1601,12 +1601,12 @@ export function Krakow3DMap() {
         </div>
       )}
 
-      {/* PŁYWAJĄCY BANER WYBORU MIEJSCA ZAMIESZKANIA */}
+      {/* PŁYWAJĄCY BANER WYBORU OBECNEGO MIEJSCA ZAMIESZKANIA */}
       {isSelectingHome && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-amber-600 text-white px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-3">
           <HomeIcon className="size-4 animate-bounce" />
           <span className="text-xs font-semibold">
-            Tryb wyboru miejsca zamieszkania: Kliknij dowolny budynek 3D na mapie
+            Tryb wyboru obecnego miejsca zamieszkania: Kliknij dowolny budynek 3D na mapie
           </span>
           <Button
             size="sm"
@@ -1624,7 +1624,7 @@ export function Krakow3DMap() {
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-blue-600 text-white px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-3">
           <Building2Icon className="size-4 animate-bounce" />
           <span className="text-xs font-semibold">
-            Tryb wyboru miejsca odniesienia: Kliknij budynek 3D na mapie
+            Tryb wyboru nowego miejsca zamieszkania: Kliknij budynek 3D na mapie
           </span>
           <Button
             size="sm"
@@ -1666,7 +1666,7 @@ export function Krakow3DMap() {
           onClick={handleCenterOnSelectedBuilding}
           disabled={!activeOriginBuilding}
           className="size-7 p-0 disabled:opacity-50"
-          title={activeOriginBuilding ? `Wycentruj na: ${activeOriginBuilding.name}` : 'Wskaż miejsce zamieszkania lub budynek na mapie'}
+          title={activeOriginBuilding ? `Wycentruj na: ${activeOriginBuilding.name}` : 'Wskaż obecne miejsce zamieszkania lub budynek na mapie'}
           aria-label="Centruj na wybranym punkcie"
         >
           <LocateFixedIcon className="size-3.5 text-primary" />
