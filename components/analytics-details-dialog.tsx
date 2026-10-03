@@ -242,10 +242,8 @@ export function AnalyticsDetailsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl max-h-[88vh] overflow-y-auto font-sans p-6 rounded-2xl">
         <DialogHeader className="space-y-1.5 border-b border-border/60 pb-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
-            <SparklesIcon className="size-3.5 text-amber-500" />
-          </div>
-          <DialogTitle className="text-lg font-bold text-foreground">
+          <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+            <SparklesIcon className="size-4 text-amber-500 shrink-0" />
             Podsumowanie
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">

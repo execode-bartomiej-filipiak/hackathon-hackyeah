@@ -50,23 +50,23 @@ const DEMO_PRESET_SCENARIOS: Record<
   string,
   { label: string; home: SelectedBuildingInfo; reference: SelectedBuildingInfo }
 > = {
-  it_specialist: {
-    label: 'Nowa Huta ↔ Zabłocie',
+  senior: {
+    label: 'Mistrzejowice ↔ Kleparz',
     home: {
-      name: 'Os. Kolorowe 12, Nowa Huta',
-      type: 'Budynek wielorodzinny',
-      height: 28,
-      levels: 8,
-      district: 'Nowa Huta',
-      coordinates: [20.038, 50.071],
-    },
-    reference: {
-      name: 'Mieszkanie, Zabłocie',
+      name: 'Mieszkanie, Mistrzejowice',
       type: 'Budynek wielorodzinny',
       height: 26,
-      levels: 8,
-      district: 'Zabłocie',
-      coordinates: [19.955, 50.047],
+      levels: 9,
+      district: 'Mistrzejowice',
+      coordinates: [20.0, 50.09],
+    },
+    reference: {
+      name: 'Mieszkanie, Kleparz',
+      type: 'Kamienica',
+      height: 20,
+      levels: 5,
+      district: 'Stare Miasto',
+      coordinates: [19.944, 50.069],
     },
   },
   student: {
