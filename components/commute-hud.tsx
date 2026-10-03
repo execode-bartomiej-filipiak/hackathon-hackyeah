@@ -21,6 +21,8 @@ import {
   ChevronRightIcon,
   MapPinIcon,
   Building2Icon,
+  CrosshairIcon,
+  XIcon,
 } from 'lucide-react';
 
 interface CommuteHudProps {
@@ -33,6 +35,9 @@ interface CommuteHudProps {
   selectedBuildingName?: string;
   onFocusDestination?: (route: CommuteRouteResult) => void;
   onSelectDemoOrigin?: () => void;
+  isAddingTarget?: boolean;
+  onToggleAddTarget?: () => void;
+  onRemoveDestination?: (destinationId: string) => void;
 }
 
 export function CommuteHud({
@@ -45,6 +50,9 @@ export function CommuteHud({
   selectedBuildingName,
   onFocusDestination,
   onSelectDemoOrigin,
+  isAddingTarget = false,
+  onToggleAddTarget,
+  onRemoveDestination,
 }: CommuteHudProps) {
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
@@ -169,30 +177,89 @@ export function CommuteHud({
 
           {/* JEŚLI BRAK WYBRANEGO BUDYNKU */}
           {!analysis ? (
-            <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4 text-center space-y-2.5">
-              <div className="size-9 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
-                <Building2Icon className="size-4.5" />
-              </div>
-              <div className="space-y-0.5">
-                <h4 className="text-xs font-semibold text-foreground">
-                  Wybierz lokalizację na mapie
-                </h4>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Kliknij dowolny budynek 3D w Krakowie, aby wyliczyć czas dojazdów dla profilu: <strong>{activeProfile.name}</strong>.
-                </p>
+            <div className="space-y-3">
+              <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4 text-center space-y-2.5">
+                <div className="size-9 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                  <Building2Icon className="size-4.5" />
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-semibold text-foreground">
+                    Wybierz lokalizację na mapie
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Kliknij dowolny budynek 3D w Krakowie, aby wyliczyć czas dojazdów dla profilu: <strong>{activeProfile.name}</strong>.
+                  </p>
+                </div>
+
+                {onSelectDemoOrigin && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={onSelectDemoOrigin}
+                    className="w-full text-xs h-7.5 gap-1.5 font-medium shadow-xs"
+                  >
+                    <SparklesIcon className="size-3 text-amber-300" />
+                    Testuj przykładowy budynek (Rynek)
+                  </Button>
+                )}
               </div>
 
-              {onSelectDemoOrigin && (
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={onSelectDemoOrigin}
-                  className="w-full text-xs h-7.5 gap-1.5 font-medium shadow-xs"
-                >
-                  <SparklesIcon className="size-3 text-amber-300" />
-                  Testuj przykładowy budynek (Rynek)
-                </Button>
-              )}
+              {/* LISTA ZDEFINIOWANYCH CELÓW Z PRZYCISKIEM DODAWANIA */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
+                  <span>Zdefiniowane cele podróży ({activeProfile.destinations.length}):</span>
+                </div>
+
+                <div className="divide-y divide-border/60 rounded-xl border border-border bg-card overflow-hidden">
+                  {activeProfile.destinations.map((dest) => (
+                    <div
+                      key={dest.id}
+                      className="group flex items-center justify-between p-2.5 hover:bg-muted/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span className="text-sm shrink-0">{dest.icon}</span>
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="text-xs font-medium text-foreground truncate">
+                            {dest.name}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <MapPinIcon className="size-2.5" />
+                            <span>{dest.frequencyPerWeek}x w tygodniu</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {onRemoveDestination && activeProfile.destinations.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveDestination(dest.id)}
+                          className="opacity-60 hover:opacity-100 p-1 hover:text-rose-500 transition-colors"
+                          title="Usuń cel"
+                        >
+                          <XIcon className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* PRZYCISK DODAWANIA NOWEGO CELU */}
+                {onToggleAddTarget && (
+                  <Button
+                    size="sm"
+                    variant={isAddingTarget ? 'default' : 'outline'}
+                    onClick={onToggleAddTarget}
+                    className={`w-full text-xs h-8 gap-2 font-medium transition-all ${
+                      isAddingTarget
+                        ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse'
+                        : 'hover:border-primary/50 border-dashed'
+                    }`}
+                  >
+                    <CrosshairIcon className="size-3.5" />
+                    <span>{isAddingTarget ? 'Anuluj wybór celu' : '+ Dodaj nowy cel na mapie'}</span>
+                  </Button>
+                )}
+              </div>
             </div>
           ) : (
             /* WYNIKI ANALIZY COMMUTE SCORE */
@@ -241,7 +308,7 @@ export function CommuteHud({
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
                   <span>Twoje cele podróży ({analysis.routes.length}):</span>
                   {selectedBuildingName && (
-                    <span className="font-normal truncate max-w-[150px] text-foreground">
+                    <span className="font-normal truncate max-w-[140px] text-foreground">
                       Z: {selectedBuildingName}
                     </span>
                   )}
@@ -280,11 +347,43 @@ export function CommuteHud({
                           </div>
                           {getStatusBadge(route.status)}
                         </div>
+
+                        {onRemoveDestination && activeProfile.destinations.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemoveDestination(route.destinationId);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 transition-opacity"
+                            title="Usuń cel"
+                          >
+                            <XIcon className="size-3.5" />
+                          </button>
+                        )}
+
                         <ChevronRightIcon className="size-3.5 text-muted-foreground group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </div>
                   ))}
                 </div>
+
+                {/* PRZYCISK DODAWANIA NOWEGO CELU W TRYBIE ANALIZY */}
+                {onToggleAddTarget && (
+                  <Button
+                    size="sm"
+                    variant={isAddingTarget ? 'default' : 'outline'}
+                    onClick={onToggleAddTarget}
+                    className={`w-full text-xs h-8 gap-2 font-medium mt-1 transition-all ${
+                      isAddingTarget
+                        ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse'
+                        : 'hover:border-primary/50 border-dashed'
+                    }`}
+                  >
+                    <CrosshairIcon className="size-3.5" />
+                    <span>{isAddingTarget ? 'Anuluj wybór celu' : '+ Dodaj nowy cel na mapie'}</span>
+                  </Button>
+                )}
               </div>
             </div>
           )}
