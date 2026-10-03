@@ -534,7 +534,7 @@ export function Krakow3DMap() {
 
     mapInstance.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left');
     mapInstance.addControl(
-      new maplibregl.AttributionControl({ compact: true, customAttribution: '3D Kraków CommuteScore PoC' }),
+      new maplibregl.AttributionControl({ compact: true, customAttribution: '3D Kraków NearBy Score PoC' }),
       'bottom-right'
     );
 

@@ -109,7 +109,7 @@ export function AnalyticsDetailsDialog({
   ).join(' · ');
 
   const scoreTooltip = [
-    `CommuteScore: ${analysis.score} / 100 (${analysis.totalHoursPerWeek} h w drodze tygodniowo).`,
+    `NearBy Score: ${analysis.score} / 100 (${analysis.totalHoursPerWeek} h w drodze tygodniowo).`,
     `Wzór: ${COMMUTE_SCORE_BASE} − (godziny w drodze / ${COMMUTE_SCORE_FULL_HOURS}) × ${COMMUTE_SCORE_FALL_PER_HOUR}, przycięty do zakresu ${COMMUTE_SCORE_MIN}–${COMMUTE_SCORE_MAX} pkt.`,
     `Punkty orientacyjne: ${[3, 7, COMMUTE_SCORE_FULL_HOURS]
       .map((hours) => `${hours} h → ${getCommuteScore(hours)} pkt`)
@@ -214,7 +214,7 @@ export function AnalyticsDetailsDialog({
   const comparisonRows = [
     {
       id: 'score',
-      label: 'CommuteScore',
+      label: 'NearBy Score',
       unit: 'pkt',
       decimals: 0,
       scalesWithHorizon: false,
@@ -279,7 +279,7 @@ export function AnalyticsDetailsDialog({
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <SparklesIcon className="size-3.5 text-primary" />
-                CommuteScore
+                NearBy Score
               </span>
               <MethodologyHint tooltip={scoreTooltip} />
             </div>
@@ -304,8 +304,8 @@ export function AnalyticsDetailsDialog({
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {hasReference
                     ? (comparison?.scoreDelta ?? 0) >= 0
-                      ? `Nowe miejsce zamieszkania podnosi CommuteScore z ${comparison?.homeScore} do ${analysis.score} punktów.`
-                      : `Nowe miejsce zamieszkania obniża CommuteScore z ${comparison?.homeScore} do ${analysis.score} punktów.`
+                      ? `Nowe miejsce zamieszkania podnosi NearBy Score z ${comparison?.homeScore} do ${analysis.score} punktów.`
+                      : `Nowe miejsce zamieszkania obniża NearBy Score z ${comparison?.homeScore} do ${analysis.score} punktów.`
                     : getScoreAssessment(analysis.score)}
                 </p>
                 <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-0.5">

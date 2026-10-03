@@ -444,7 +444,9 @@ export function CommuteHud({
                     )} shadow-sm shrink-0`}
                   >
                     <span className="text-xl font-black leading-none">{analysis.score}</span>
-                    <span className="text-[9px] uppercase font-bold tracking-wider opacity-80 mt-0.5">
+                    <span className="text-[7px] uppercase font-bold tracking-wide opacity-80 mt-0.5 leading-tight text-center">
+                      NearBy
+                      <br />
                       Score
                     </span>
                   </div>
