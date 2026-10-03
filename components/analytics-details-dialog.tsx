@@ -211,23 +211,31 @@ export function AnalyticsDetailsDialog({
               </p>
 
               <div className="pt-2 border-t border-border/50 text-[11px] space-y-1 text-muted-foreground">
-                {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (
+                {comparison && comparison.hasReference ? (
                   <>
                     <div className="flex items-center justify-between">
-                      <span>Obecne mieszkanie:</span>
-                      <span className="font-semibold text-foreground">{analysis.comparisonToHome.homeHoursPerWeek} h / tydz.</span>
+                      <span>Obecne miejsce zamieszkania:</span>
+                      <span className="font-semibold text-foreground">
+                        {comparison.homeHoursPerWeek} h / tydz.
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Nowe miejsce zamieszkania:</span>
+                      <span className="font-semibold text-foreground">
+                        {analysis.totalHoursPerWeek} h / tydz.
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Różnica czasu:</span>
-                      {analysis.comparisonToHome.savedHoursPerWeek >= 0 ? (
+                      {comparison.savedHoursPerWeek >= 0 ? (
                         <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
                           <TrendingDownIcon className="size-3" />
-                          -{analysis.comparisonToHome.savedHoursPerWeek} h (oszczędność)
+                          -{comparison.savedHoursPerWeek} h (oszczędność)
                         </span>
                       ) : (
                         <span className="text-rose-500 font-bold flex items-center gap-0.5">
                           <TrendingUpIcon className="size-3" />
-                          +{Math.abs(analysis.comparisonToHome.savedHoursPerWeek)} h dłużej
+                          +{Math.abs(comparison.savedHoursPerWeek)} h dłużej
                         </span>
                       )}
                     </div>
@@ -273,23 +281,27 @@ export function AnalyticsDetailsDialog({
               </div>
 
               <div className="pt-2 border-t border-emerald-500/20 text-[11px] space-y-1 text-emerald-800 dark:text-emerald-300">
-                {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (
+                {comparison && comparison.hasReference ? (
                   <>
                     <div className="flex items-center justify-between">
-                      <span>Obecne mieszkanie:</span>
-                      <span className="font-semibold">{analysis.comparisonToHome.homeCo2Kg} kg CO₂/tydz.</span>
+                      <span>Obecne miejsce zamieszkania:</span>
+                      <span className="font-semibold">{comparison.homeCo2Kg} kg CO₂/tydz.</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Nowe miejsce zamieszkania:</span>
+                      <span className="font-semibold">{analysis.totalWeeklyCo2Kg} kg CO₂/tydz.</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Różnica emisji:</span>
-                      {analysis.comparisonToHome.savedCo2Kg >= 0 ? (
+                      {comparison.savedCo2Kg >= 0 ? (
                         <span className="font-bold flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300">
                           <TrendingDownIcon className="size-3" />
-                          -{analysis.comparisonToHome.savedCo2Kg} kg CO₂/tydz.
+                          -{comparison.savedCo2Kg} kg CO₂/tydz.
                         </span>
                       ) : (
                         <span className="font-bold flex items-center gap-0.5 text-rose-500">
                           <TrendingUpIcon className="size-3" />
-                          +{Math.abs(analysis.comparisonToHome.savedCo2Kg)} kg CO₂/tydz.
+                          +{Math.abs(comparison.savedCo2Kg)} kg CO₂/tydz.
                         </span>
                       )}
                     </div>
@@ -346,9 +358,15 @@ export function AnalyticsDetailsDialog({
               {comparison && comparison.hasReference ? (
                 <>
                   <div className="flex items-center justify-between">
-                    <span>Obecne mieszkanie:</span>
+                    <span>Obecne miejsce zamieszkania:</span>
                     <span className="font-semibold text-foreground tabular-nums">
                       {formatPln(comparison.homeWeeklyCostPln, 0)} zł / tydz.
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Nowe miejsce zamieszkania:</span>
+                    <span className="font-semibold text-foreground tabular-nums">
+                      {formatPln(analysis.totalWeeklyCostPln, 0)} zł / tydz.
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -415,7 +433,8 @@ export function AnalyticsDetailsDialog({
           {/* TABELA ZESTAWIENIA TRAS I CELÓW */}
           <div className="space-y-1.5">
             <span className="text-xs font-semibold text-foreground px-0.5 block">
-              Zestawienie tras i emisji per cel podróży ({analysis.routes.length}):
+              Zestawienie tras i emisji per cel podróży — nowe miejsce zamieszkania (
+              {analysis.routes.length}):
             </span>
 
             <div className="border border-border rounded-xl overflow-hidden divide-y divide-border/60 bg-card text-xs">
