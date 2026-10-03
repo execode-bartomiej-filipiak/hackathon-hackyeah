@@ -52,3 +52,14 @@ export interface CommuteProfile {
   description: string;
   destinations: CommuteDestination[];
 }
+
+// Pozycja gotowego scenariusza demonstracyjnego prezentowana w panelu HUD
+export interface CommutePresetOption {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  scenario: string; // np. "Nowa Huta ↔ Śródmieście"
+  destinationsCount: number;
+  weeklyVisits: number; // suma częstotliwości wizyt wszystkich celów
+}

@@ -29,6 +29,7 @@ import { CommuteHud } from '@/components/commute-hud';
 import { AddDestinationDialog } from '@/components/add-destination-dialog';
 import { AddressSearch, type SearchResultItem } from '@/components/address-search';
 import type {
+  CommutePresetOption,
   CommuteProfile,
   TravelMode,
   CommuteAnalysis,
@@ -50,6 +51,70 @@ interface PendingNewDestination {
   initialAddress: string;
   district: string;
 }
+
+// Trzy gotowe scenariusze dla jury — każdy pokazuje inny typ decyzji mieszkaniowej
+const DEMO_PRESET_SCENARIOS: Record<
+  string,
+  { label: string; home: SelectedBuildingInfo; reference: SelectedBuildingInfo }
+> = {
+  it_specialist: {
+    label: 'Nowa Huta ↔ Zabłocie',
+    home: {
+      name: 'Os. Kolorowe 12, Nowa Huta',
+      type: 'Budynek wielorodzinny',
+      height: 28,
+      levels: 8,
+      district: 'Nowa Huta',
+      coordinates: [20.038, 50.071],
+    },
+    reference: {
+      name: 'Mieszkanie, Zabłocie',
+      type: 'Budynek wielorodzinny',
+      height: 26,
+      levels: 8,
+      district: 'Zabłocie',
+      coordinates: [19.955, 50.047],
+    },
+  },
+  student: {
+    label: 'Podgórze ↔ Krowodrza',
+    home: {
+      name: 'Wynajem, Podgórze',
+      type: 'Kamienica',
+      height: 20,
+      levels: 4,
+      district: 'Podgórze',
+      coordinates: [19.949, 50.04],
+    },
+    reference: {
+      name: 'Mieszkanie, Krowodrza (AGH)',
+      type: 'Budynek wielorodzinny',
+      height: 24,
+      levels: 8,
+      district: 'Krowodrza',
+      coordinates: [19.915, 50.073],
+    },
+  },
+  family: {
+    label: 'Bieżanów ↔ Prądnik Biały',
+    home: {
+      name: 'Dom, Bieżanów',
+      type: 'Zabudowa jednorodzinna',
+      height: 12,
+      levels: 3,
+      district: 'Bieżanów',
+      coordinates: [19.965, 50.011],
+    },
+    reference: {
+      name: 'Mieszkanie, Prądnik Biały',
+      type: 'Budynek wielorodzinny',
+      height: 30,
+      levels: 10,
+      district: 'Prądnik Biały',
+      coordinates: [19.94, 50.089],
+    },
+  },
+};
 
 // Spójny językiem wizualnym z panelami HUD: ciemne szkło + akcent kolorystyczny statusu
 const DESTINATION_PIN_STYLES: Record<
@@ -278,6 +343,16 @@ export function Krakow3DMap() {
     ...activeProfile,
     destinations: currentDestinations,
   };
+
+  const presetOptions: CommutePresetOption[] = profiles.map((profile) => ({
+    id: profile.id,
+    name: profile.name,
+    icon: profile.icon,
+    description: profile.description,
+    scenario: DEMO_PRESET_SCENARIOS[profile.id]?.label ?? '',
+    destinationsCount: profile.destinations.length,
+    weeklyVisits: profile.destinations.reduce((sum, d) => sum + d.frequencyPerWeek, 0),
+  }));
 
   const [activeFocusPoint, setActiveFocusPoint] = useState<'home' | 'reference'>('reference');
   const activeFocusPointRef = useRef<'home' | 'reference'>('reference');
@@ -1314,11 +1389,11 @@ export function Krakow3DMap() {
     });
   };
 
-  // Prezentacyjny przycisk wyboru budynku na scenie
-  const handleSelectDemoOrigin = () => {
-    if (!mapRef.current) return;
-
-    setHasPresetLoaded(true);
+  // Wczytanie gotowego scenariusza demonstracyjnego (para: miejsce zamieszkania + lokalizacja oceniana)
+  const handleSelectPreset = (profileId: string) => {
+    const map = mapRef.current;
+    const scenario = DEMO_PRESET_SCENARIOS[profileId];
+    if (!map || !scenario) return;
 
     if (selectedMarkerRef.current) {
       isSwitchingBuildingRef.current = true;
@@ -1327,45 +1402,35 @@ export function Krakow3DMap() {
       isSwitchingBuildingRef.current = false;
     }
 
-    const demoHomeCoords: [number, number] = [20.0380, 50.0710];
-    const demoHomeBuilding: SelectedBuildingInfo = {
-      name: 'Os. Kolorowe 12, Nowa Huta',
-      type: 'Budynek wielorodzinny',
-      height: 28,
-      levels: 8,
-      district: 'Nowa Huta',
-      coordinates: demoHomeCoords,
-    };
-
-    const demoRefCoords: [number, number] = [19.9373, 50.0617];
-    const demoRefBuilding: SelectedBuildingInfo = {
-      name: 'Sukiennice & Rynek Główny',
-      type: 'Zabytkowa / Handlowa',
-      height: 24,
-      levels: 3,
-      district: 'Stare Miasto',
-      coordinates: demoRefCoords,
-    };
-
-    setHomeBuilding(demoHomeBuilding);
-    setReferenceBuilding(demoRefBuilding);
-    homeBuildingRef.current = demoHomeBuilding;
-    referenceBuildingRef.current = demoRefBuilding;
-    setSelectedBuilding(demoRefBuilding);
+    setActiveProfileId(profileId);
+    setHasPresetLoaded(true);
+    setCustomDestinations([]);
+    setHomeBuilding(scenario.home);
+    setReferenceBuilding(scenario.reference);
+    homeBuildingRef.current = scenario.home;
+    referenceBuildingRef.current = scenario.reference;
+    setSelectedBuilding(scenario.reference);
     setActiveFocusPoint('reference');
     activeFocusPointRef.current = 'reference';
     cachedAnalysisRef.current = {};
 
-    showBuildingHighlightAndIndicator(mapRef.current, demoRefBuilding, 'reference');
+    showBuildingHighlightAndIndicator(map, scenario.reference, 'reference');
 
-    mapRef.current.flyTo({
-      center: demoRefCoords,
+    map.flyTo({
+      center: scenario.reference.coordinates,
       zoom: 16.3,
       pitch: 62,
       bearing: -20,
       essential: true,
       duration: 1600,
     });
+
+    const profile = profiles.find((p) => p.id === profileId);
+    if (profile) {
+      toast.success(`Scenariusz: ${profile.name}`, {
+        description: `${scenario.label} • ${profile.destinations.length} cele do przeanalizowania`,
+      });
+    }
   };
   // Usuwanie zdefiniowanego celu
   const handleRemoveDestination = (destinationId: string) => {
@@ -1619,7 +1684,9 @@ export function Krakow3DMap() {
         activeFocusPoint={activeFocusPoint}
         onSelectFocusPoint={handleSelectFocusPoint}
         onFocusDestination={handleFocusDestination}
-        onSelectDemoOrigin={handleSelectDemoOrigin}
+        presets={presetOptions}
+        activePresetId={hasPresetLoaded ? activeProfileId : undefined}
+        onSelectPreset={handleSelectPreset}
         isAddingTarget={isAddingTarget}
         onToggleAddTarget={() => {
           if (!isAddingTarget) {

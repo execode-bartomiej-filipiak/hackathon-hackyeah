@@ -32,7 +32,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '☕',
         coordinates: [19.9373, 50.0617],
         frequencyPerWeek: 2,
-        travelMode: 'walking',
+        travelMode: 'transit',
       },
       {
         id: 'dest_it_shop',
@@ -102,7 +102,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🎒',
         coordinates: [19.9250, 50.0780],
         frequencyPerWeek: 5,
-        travelMode: 'walking',
+        travelMode: 'transit',
       },
       {
         id: 'dest_fam_work',

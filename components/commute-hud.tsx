@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type {
+  CommutePresetOption,
   CommuteProfile,
   TravelMode,
   CommuteAnalysis,
@@ -20,7 +21,7 @@ import {
   TrendingDownIcon,
   TrendingUpIcon,
   ChevronRightIcon,
-
+  ChevronDownIcon,
   Building2Icon,
   CrosshairIcon,
   PencilIcon,
@@ -67,7 +68,9 @@ interface CommuteHudProps {
   activeFocusPoint?: 'home' | 'reference';
   onSelectFocusPoint?: (point: 'home' | 'reference') => void;
   onFocusDestination?: (route: CommuteRouteResult) => void;
-  onSelectDemoOrigin?: () => void;
+  presets?: CommutePresetOption[];
+  activePresetId?: string;
+  onSelectPreset?: (profileId: string) => void;
   isAddingTarget?: boolean;
   onToggleAddTarget?: () => void;
   isSelectingHome?: boolean;
@@ -92,7 +95,9 @@ export function CommuteHud({
   activeFocusPoint = 'reference',
   onSelectFocusPoint,
   onFocusDestination,
-  onSelectDemoOrigin,
+  presets,
+  activePresetId,
+  onSelectPreset,
   isAddingTarget = false,
   onToggleAddTarget,
   isSelectingHome = false,
@@ -114,6 +119,8 @@ export function CommuteHud({
   };
 
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [isPresetsOpen, setIsPresetsOpen] = useState(true);
+  const activePreset = presets?.find((preset) => preset.id === activePresetId);
 
   const effectiveHomeName = homeBuildingName || (!referenceBuildingName ? selectedBuildingName : undefined);
   const effectiveRefName = referenceBuildingName;
@@ -128,7 +135,7 @@ export function CommuteHud({
   const timeScope = hasReference ? 'vs mieszkanie' : 'vs norma krakowska';
 
   return (
-    <div className="absolute top-4 right-4 z-20 w-80 sm:w-96 max-h-[calc(100vh-2rem)] flex flex-col gap-2.5 overflow-y-auto pointer-events-auto select-none font-sans scrollbar-none">
+    <div className="absolute top-4 right-4 z-20 w-80 sm:w-96 max-h-[calc(100vh-2rem)] flex flex-col gap-1.5 overflow-y-auto pointer-events-auto select-none font-sans scrollbar-none">
       {/* KARTA GŁÓWNA COMMUTE SCORE */}
       <Card className="border border-border/80 bg-background/90 backdrop-blur-md shadow-2xl rounded-2xl overflow-hidden p-0">
         <CardContent className="p-4 space-y-3.5">
@@ -390,20 +397,6 @@ export function CommuteHud({
                 )}
               </div>
 
-              {/* 4. DÓŁ: PRZYCISK TESTUJ PRZYKŁADOWE DANE */}
-              {onSelectDemoOrigin && (
-                <div className="pt-1 border-t border-border/40">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={onSelectDemoOrigin}
-                    className="w-full text-xs h-8 gap-1.5 font-medium shadow-xs"
-                  >
-                    <SparklesIcon className="size-3.5 text-amber-300" />
-                    Testuj przykładowe dane
-                  </Button>
-                </div>
-              )}
             </div>
           ) : (
             /* WYNIKI ANALIZY COMMUTE SCORE */
@@ -692,8 +685,78 @@ export function CommuteHud({
               </div>
             </div>
           )}
+
         </CardContent>
       </Card>
+
+      {/* OSOBNY PANELIK: GOTOWE SCENARIUSZE DLA JURY (ZWĲANY PO WYBORZE) */}
+      {presets && presets.length > 0 && onSelectPreset && (
+        <Card className="border border-border/80 bg-background/90 backdrop-blur-md shadow-2xl rounded-2xl overflow-hidden p-0 shrink-0">
+          <CardContent className="p-1.5">
+            <button
+              type="button"
+              onClick={() => setIsPresetsOpen((prev) => !prev)}
+              title={isPresetsOpen ? 'Zwiń scenariusze' : 'Rozwiń scenariusze'}
+              className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded-lg hover:bg-muted/60 transition-colors cursor-pointer"
+            >
+              <SparklesIcon className="size-3 text-amber-500 shrink-0" />
+              <span className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground shrink-0">
+                Scenariusze jury
+              </span>
+              <span className="flex-1 min-w-0 flex items-center gap-1 text-[11px] font-semibold text-foreground">
+                {activePreset && (
+                  <>
+                    <span className="shrink-0">{activePreset.icon}</span>
+                    <span className="truncate">{activePreset.name}</span>
+                  </>
+                )}
+              </span>
+              <ChevronDownIcon
+                className={`size-3.5 text-muted-foreground shrink-0 transition-transform ${
+                  isPresetsOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {isPresetsOpen && (
+              <div className="mt-1 space-y-1">
+                {presets.map((preset) => {
+                  const isActive = activePresetId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        onSelectPreset(preset.id);
+                        setIsPresetsOpen(false);
+                      }}
+                      title={`${preset.description}${preset.scenario ? ` • ${preset.scenario}` : ''} • ${preset.destinationsCount} cele, ${preset.weeklyVisits} wizyt/tydz.`}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        isActive
+                          ? 'border-primary ring-1 ring-primary/25 bg-primary/5'
+                          : 'border-border bg-card hover:border-primary/40 hover:bg-primary/5'
+                      }`}
+                    >
+                      <span className="text-sm leading-none shrink-0">{preset.icon}</span>
+                      <span className="text-[11px] font-semibold text-foreground truncate flex-1 min-w-0">
+                        {preset.name}
+                      </span>
+                      {isActive && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[8px] font-bold leading-none shrink-0">
+                          Aktywne
+                        </span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                        {preset.weeklyVisits}x/tydz.
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* MODAL ZE SZCZEGÓŁAMI ANALITYKI I EKOLOGII */}
       {analysis && (
