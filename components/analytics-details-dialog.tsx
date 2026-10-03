@@ -26,7 +26,6 @@ import {
   COMMUTE_SCORE_MAX,
   COMMUTE_SCORE_MIN,
   FUEL_PRICE_PLN_PER_LITER,
-  KRAKOW_BENCHMARK_HOURS,
   MPK_TICKETS,
   getCo2FactorKgPerKm,
   getCommuteScore,
@@ -42,6 +41,9 @@ const HORIZONS = [
 ] as const;
 
 type HorizonId = (typeof HORIZONS)[number]['id'];
+
+// Przykładowa cena kawy na mieście — punkt odniesienia dla kosztu alternatywnego
+const COFFEE_PRICE_PLN = 15;
 
 // Dyskretna etykieta „Metodologia obliczeń” — szczegóły w tooltipie po najechaniu
 function MethodologyHint({ tooltip }: { tooltip: string }) {
@@ -139,17 +141,50 @@ export function AnalyticsDetailsDialog({
   const formatValue = (value: number, decimals: number) =>
     decimals === 0 ? formatPln(value, 0) : value.toFixed(decimals);
 
-  // Kontekst decyzyjny: najdłuższy dojazd oraz porównanie z normą krakowską
-  const routes = analysis.routes;
-  const worstRoute = routes.length
-    ? routes.reduce((a, b) => (b.durationMinutes > a.durationMinutes ? b : a))
-    : null;
-  const benchmarkDeltaHours = Math.abs(
-    Number((KRAKOW_BENCHMARK_HOURS - analysis.totalHoursPerWeek).toFixed(1))
-  );
-  const belowBenchmark = analysis.totalHoursPerWeek <= KRAKOW_BENCHMARK_HOURS;
-  const yearlyCarSavingPln = Math.round(analysis.weeklyCostSavingsVsCarPln * 52);
-  const yearlyCo2SavingKg = Math.round(analysis.weeklyCo2SavingsKg * 52);
+  // Oszczędności tygodniowe względem obecnego miejsca zamieszkania
+  const savedHoursWeekly = hasReference
+    ? comparison?.savedHoursPerWeek ?? 0
+    : analysis.weeklySavingsHours;
+  const savedCostWeekly = hasReference
+    ? comparison?.savedCostWeeklyPln ?? 0
+    : analysis.weeklyCostSavingsVsCarPln;
+  const savedCo2Weekly = hasReference ? comparison?.savedCo2Kg ?? 0 : analysis.weeklyCo2SavingsKg;
+
+  // Fun facty: liczby przelozone na cos wyobrazalnego
+  const yearlyHoursSaved = Math.abs(savedHoursWeekly) * 52;
+  const yearlyCostSaved = Math.abs(savedCostWeekly) * 52;
+  const yearlyCo2Saved = Math.abs(savedCo2Weekly) * 52;
+
+
+  const headlineFact = {
+    emoji: '🗓️',
+    value: `${Math.round(yearlyHoursSaved / 24)} dni`,
+    label: `wolnego w ciągu roku — tyle czasu odzyskujesz na dojazdach (${formatValue(
+      yearlyHoursSaved,
+      0
+    )} h mniej w drodze)`,
+  };
+
+  const facts = [
+    {
+      emoji: '☕',
+      value: `≈ ${Math.round(yearlyCostSaved / COFFEE_PRICE_PLN)} kaw`,
+      label: `na mieście za roczną oszczędność ${formatPln(yearlyCostSaved, 0)} zł (po ${formatPln(
+        COFFEE_PRICE_PLN,
+        0
+      )} zł)`,
+    },
+    {
+      emoji: '🌳',
+      value: `${analysis.treesEquivalentWeekly} drzew`,
+      label: `równowartość CO₂, którego nie wyemitujesz (${Math.round(yearlyCo2Saved)} kg w roku)`,
+    },
+    {
+      emoji: '⏱️',
+      value: `${Math.round((analysis.totalHoursPerWeek * 60) / 7)} min`,
+      label: 'dziennie w drodze z nowego mieszkania — mniej niż odcinek serialu',
+    },
+  ];
 
   // Zestawienie decyzyjne: obecne vs nowe miejsce zamieszkania (w wybranym horyzoncie)
   const homeHours = comparison?.homeHoursPerWeek ?? 0;
@@ -211,7 +246,7 @@ export function AnalyticsDetailsDialog({
             <SparklesIcon className="size-3.5 text-amber-500" />
           </div>
           <DialogTitle className="text-lg font-bold text-foreground">
-            Szczegółowa analityka dojazdów miejskich
+            Podsumowanie
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             {homeBuildingName
@@ -354,51 +389,41 @@ export function AnalyticsDetailsDialog({
             </div>
           )}
 
-          {/* WNIOSKI */}
-          <div className="p-3.5 rounded-xl border border-border bg-card space-y-2">
-            <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <SparklesIcon className="size-3.5 text-primary" />
-              Wnioski dla nowego miejsca zamieszkania
-            </span>
-            <ul className="text-[11px] text-muted-foreground leading-relaxed space-y-1.5 list-disc pl-4">
-              <li>
-                Tygodniowo w drodze:{' '}
-                <b className="font-semibold text-foreground">{analysis.totalHoursPerWeek} h</b> —{' '}
-                {belowBenchmark ? 'o' : 'ponad'}{' '}
-                <b className="font-semibold text-foreground">
-                  {benchmarkDeltaHours} h {belowBenchmark ? 'mniej' : 'więcej'}
-                </b>{' '}
-                niż średnia krakowska ({KRAKOW_BENCHMARK_HOURS} h).
-              </li>
-              {worstRoute && (
-                <li>
-                  Najwięcej czasu pochłania{' '}
-                  <b className="font-semibold text-foreground">{worstRoute.destinationName}</b> —{' '}
-                  {worstRoute.durationMinutes} min w jedną stronę.
-                </li>
-              )}
-              <li>
-                {yearlyCarSavingPln > 0 ? (
-                  <>
-                    Rezygnacja z samochodu na rzecz obecnych środków transportu to{' '}
-                    <b className="font-semibold text-foreground">
-                      {formatPln(yearlyCarSavingPln, 0)} zł
-                    </b>{' '}
-                    rocznie mniej w budżecie.
-                  </>
-                ) : (
-                  <>
-                    Przy tych trasach same bilety MPK kosztują więcej niż paliwo — najtaniej wypadają{' '}
-                    <b className="font-semibold text-foreground">rower i spacer</b> (0 zł).
-                  </>
-                )}
-              </li>
-              <li>
-                Roczna oszczędność emisji vs wariant samochodowy:{' '}
-                <b className="font-semibold text-foreground">{yearlyCo2SavingKg} kg CO₂</b> — jak
-                posadzenie 🌲 ≈ {analysis.treesEquivalentWeekly} drzew.
-              </li>
-            </ul>
+          {/* KOSZT ALTERNATYWNY — NA CO PRZEKŁADAJĄ SIĘ TE OSZCZĘDNOŚCI */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-3.5 py-2.5 border-b border-border/60 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <SparklesIcon className="size-3 text-amber-500 shrink-0" />
+                Koszt alternatywny — co zyskujesz
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                obecne → nowe miejsce zamieszkania
+              </span>
+            </div>
+
+            {/* NAJWAŻNIEJSZY ZYSK — WYSTAWIONY NA PIERWSZY PLAN */}
+            <div className="px-3.5 py-4 flex flex-col items-center text-center gap-1.5 bg-primary/[0.04]">
+              <span className="text-3xl leading-none">{headlineFact.emoji}</span>
+              <div className="text-3xl font-black text-primary tabular-nums leading-none">
+                {headlineFact.value}
+              </div>
+              <div className="text-[10px] text-muted-foreground leading-snug max-w-[440px]">
+                {headlineFact.label}
+              </div>
+            </div>
+
+            {/* POZOSTAŁE ZYSKI — PAS W TRZECH KOLUMNACH */}
+            <div className="grid grid-cols-3 divide-x divide-border/60 border-t border-border/60">
+              {facts.map((fact) => (
+                <div key={fact.label} className="px-2.5 py-3 text-center space-y-1.5">
+                  <div className="text-lg leading-none">{fact.emoji}</div>
+                  <div className="text-sm font-black text-foreground tabular-nums leading-none">
+                    {fact.value}
+                  </div>
+                  <div className="text-[9px] text-muted-foreground leading-snug">{fact.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
