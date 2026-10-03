@@ -196,69 +196,82 @@ export async function fetchOsmStreetRoute(
   const profile = mode === 'bicycling' ? 'bike' : mode === 'walking' ? 'foot' : 'driving';
   const url = `https://router.project-osrm.org/route/v1/${profile}/${origin[0]},${origin[1]};${dest[0]},${dest[1]}?overview=full&geometries=geojson`;
 
-  try {
+  const executeFetch = async (timeoutMs: number) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2400);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const onAbort = () => controller.abort();
     if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (signal) signal.removeEventListener('abort', onAbort);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (signal) signal.removeEventListener('abort', onAbort);
 
-    if (!res.ok) return null;
+      if (!res.ok) return null;
 
-    const data = (await res.json()) as {
-      code: string;
-      routes?: Array<{
-        distance: number; // w metrach
-        duration: number; // w sekundach
-        geometry?: {
-          type: 'LineString';
-          coordinates: Array<[number, number]>;
-        };
-      }>;
-    };
+      const data = (await res.json()) as {
+        code: string;
+        routes?: Array<{
+          distance: number; // w metrach
+          duration: number; // w sekundach
+          geometry?: {
+            type: 'LineString';
+            coordinates: Array<[number, number]>;
+          };
+        }>;
+      };
 
-    if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+      if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+        return null;
+      }
+
+      const route = data.routes[0];
+      const coords = route.geometry?.coordinates;
+      if (!coords || coords.length < 2) return null;
+
+      const distanceKm = Number((route.distance / 1000).toFixed(1));
+      let durationMinutes = 0;
+
+      switch (mode) {
+        case 'driving':
+          // Czas jazdy OSRM + 3.5 min stałego czasu na parkowanie/dojście
+          durationMinutes = Math.max(3, Math.round(route.duration / 60 + 3.5));
+          break;
+        case 'transit':
+          // Trasa poprowadzona głównymi korytarzami drogowymi + parametry MPK Kraków (19 km/h + 4.5 min przystanki)
+          durationMinutes = Math.max(4, Math.round((distanceKm / 19) * 60 + 4.5));
+          break;
+        case 'bicycling':
+        case 'walking':
+          durationMinutes = Math.max(2, Math.round(route.duration / 60));
+          break;
+      }
+
+      return {
+        coordinates: coords,
+        durationMinutes,
+        distanceKm,
+      };
+    } catch {
+      clearTimeout(timeoutId);
+      if (signal) signal.removeEventListener('abort', onAbort);
       return null;
     }
+  };
 
-    const route = data.routes[0];
-    const coords = route.geometry?.coordinates;
-    if (!coords || coords.length < 2) return null;
+  // Pierwsza próba z solidnym timeoutem 6.5s (zapobiega przedwczesnym fallbackom)
+  let result = await executeFetch(6500);
 
-    const distanceKm = Number((route.distance / 1000).toFixed(1));
-    let durationMinutes = 0;
-
-    switch (mode) {
-      case 'driving':
-        // Czas jazdy OSRM + 3.5 min stałego czasu na parkowanie/dojście
-        durationMinutes = Math.max(3, Math.round(route.duration / 60 + 3.5));
-        break;
-      case 'transit':
-        // Trasa poprowadzona głównymi korytarzami drogowymi + parametry MPK Kraków (19 km/h + 4.5 min przystanki)
-        durationMinutes = Math.max(4, Math.round((distanceKm / 19) * 60 + 4.5));
-        break;
-      case 'bicycling':
-      case 'walking':
-        durationMinutes = Math.max(2, Math.round(route.duration / 60));
-        break;
-    }
-
-    const result = {
-      coordinates: coords,
-      durationMinutes,
-      distanceKm,
-    };
-
-    routeCache.set(cacheKey, result);
-    return result;
-  } catch {
-    // Cichy fallback przy braku sieci / timeoutcie
-    return null;
+  // Jeśli chwilowy błąd sieci, ponawiamy jeszcze raz próbę
+  if (!result && (!signal || !signal.aborted)) {
+    result = await executeFetch(4000);
   }
+
+  if (result) {
+    routeCache.set(cacheKey, result);
+  }
+  return result;
 }
 
 /**

@@ -696,20 +696,33 @@ export function Krakow3DMap() {
     if (!map || !mapLoaded) return;
 
     if (selectedBuilding) {
-      // 1. Natychmiastowe obliczenia bazowe (linie i HUD widoczne od razu)
+      // 1. Natychmiastowe wstępne wyniki w panelu HUD i markery celów
       const baseAnalysis = calculateCommuteAnalysis(
         selectedBuilding.coordinates,
         activeProfile.destinations
       );
       setCommuteAnalysis(baseAnalysis);
-      routesRef.current = baseAnalysis.routes;
-      updateTrajectoriesLayer(map, baseAnalysis.routes);
       updateDestinationMarkers(map, activeProfile.destinations, baseAnalysis.routes);
 
-      // 2. Asynchroniczne dociągnięcie prawdziwych tras po ulicach Krakowa (OSRM)
+      // Czyścimy poprzednie trajektorie, by uniknąć przeskakiwania
+      updateTrajectoriesLayer(map, []);
+      const pulseSrc = map.getSource('commute-pulses-source');
+      if (pulseSrc && pulseSrc.type === 'geojson') {
+        (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+      }
+
+      // 2. Zaplanowanie awaryjnego fallbacku na łuki dopiero po dłuższym czasie (6.5s)
       const controller = new AbortController();
       let isCancelled = false;
 
+      const fallbackTimer = setTimeout(() => {
+        if (isCancelled || !mapRef.current) return;
+        // Aktywujemy bezpieczny fallback na łuki dopiero, gdy OSRM rzeczywiście nie odpowiedział
+        routesRef.current = baseAnalysis.routes;
+        updateTrajectoriesLayer(mapRef.current, baseAnalysis.routes);
+      }, 6500);
+
+      // 3. Asynchroniczne pobranie prawdziwych tras po ulicach Krakowa (OSRM)
       fetchEnhancedCommuteAnalysis(
         selectedBuilding.coordinates,
         activeProfile.destinations,
@@ -717,6 +730,7 @@ export function Krakow3DMap() {
         controller.signal
       )
         .then((realAnalysis) => {
+          clearTimeout(fallbackTimer);
           if (isCancelled || !mapRef.current) return;
           setCommuteAnalysis(realAnalysis);
           routesRef.current = realAnalysis.routes;
@@ -724,11 +738,15 @@ export function Krakow3DMap() {
           updateDestinationMarkers(mapRef.current, activeProfile.destinations, realAnalysis.routes);
         })
         .catch(() => {
-          // cichy fallback na bazę obliczeniową
+          clearTimeout(fallbackTimer);
+          if (isCancelled || !mapRef.current) return;
+          routesRef.current = baseAnalysis.routes;
+          updateTrajectoriesLayer(mapRef.current, baseAnalysis.routes);
         });
 
       return () => {
         isCancelled = true;
+        clearTimeout(fallbackTimer);
         controller.abort();
       };
     } else {
