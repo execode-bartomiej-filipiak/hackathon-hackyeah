@@ -15,7 +15,6 @@ import {
   TrendingDownIcon,
   TrendingUpIcon,
   SparklesIcon,
-  CheckCircle2Icon,
   InfoIcon,
 } from 'lucide-react';
 import {
@@ -258,10 +257,6 @@ export function AnalyticsDetailsDialog({
                       : `Nowe miejsce zamieszkania obniża NearBy Score z ${comparison?.homeScore} do ${analysis.score} punktów.`
                     : getScoreAssessment(analysis.score)}
                 </p>
-                <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-0.5">
-                  <CheckCircle2Icon className="size-3.5 shrink-0" />
-                  <span>Wyliczone na podstawie realnych tras i prędkości ruchu w Krakowie</span>
-                </div>
               </div>
             </div>
           </div>
