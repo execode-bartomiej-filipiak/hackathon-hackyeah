@@ -13,10 +13,10 @@ import type {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Button } from '@/components/ui/button';
 import {
-  CompassIcon,
   RotateCwIcon,
   InfoIcon,
   CrosshairIcon,
+  LocateFixedIcon,
 } from 'lucide-react';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import { calculateCommuteAnalysis, fetchEnhancedCommuteAnalysis } from '@/lib/commute';
@@ -202,8 +202,6 @@ export function Krakow3DMap() {
   const animFrameRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuildingInfo | null>(null);
-  const [pitch, setPitch] = useState(62);
-  const [bearing, setBearing] = useState(-20);
   const [isRotating, setIsRotating] = useState(false);
 
   // Stan profili i celów podróży
@@ -677,8 +675,6 @@ export function Krakow3DMap() {
         }
       });
 
-      mapInstance.on('rotate', () => setBearing(Math.round(mapInstance.getBearing())));
-      mapInstance.on('pitch', () => setPitch(Math.round(mapInstance.getPitch())));
     });
 
     mapRef.current = mapInstance;
@@ -865,7 +861,6 @@ export function Krakow3DMap() {
       if (!isRotatingRef.current || !mapRef.current) return;
       const currentBearing = mapRef.current.getBearing();
       mapRef.current.setBearing((currentBearing + 0.35) % 360);
-      setBearing(Math.round(mapRef.current.getBearing()));
       animId = requestAnimationFrame(rotateStep);
     };
 
@@ -914,6 +909,18 @@ export function Krakow3DMap() {
       zoom: 15.2,
       pitch: 58,
       duration: 1600,
+      essential: true,
+    });
+  };
+
+  // Centrowanie widoku mapy na wybranym aktualnie budynku (punkcie)
+  const handleCenterOnSelectedBuilding = () => {
+    if (!mapRef.current || !selectedBuilding) return;
+    mapRef.current.flyTo({
+      center: selectedBuilding.coordinates,
+      zoom: 16.5,
+      pitch: 62,
+      duration: 1200,
       essential: true,
     });
   };
@@ -1103,14 +1110,17 @@ export function Krakow3DMap() {
           {isRotating ? 'Zatrzymaj' : 'Obrót 360°'}
         </Button>
 
-        <div className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono text-muted-foreground border-l border-border">
-          <CompassIcon className="size-3.5 text-primary" />
-          <span>Kąt: {pitch}°</span>
-        </div>
-
-        <div className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono text-muted-foreground border-l border-border">
-          <span>Azymut: {bearing}°</span>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCenterOnSelectedBuilding}
+          disabled={!selectedBuilding}
+          className="text-xs h-7 px-2.5 gap-1.5 font-medium disabled:opacity-50"
+          title={selectedBuilding ? `Wycentruj na: ${selectedBuilding.name}` : 'Wybierz budynek na mapie, aby wycentrować'}
+        >
+          <LocateFixedIcon className="size-3.5 text-primary" />
+          <span>Centruj punkt</span>
+        </Button>
 
         <Button
           variant="ghost"
