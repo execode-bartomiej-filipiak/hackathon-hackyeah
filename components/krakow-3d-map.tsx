@@ -1268,19 +1268,36 @@ export function Krakow3DMap() {
     }
   };
 
-  // Fokus na trasie do wybranego celu z panelu HUD
+  // Fokus na trasie do wybranego celu z panelu HUD — kamera obejmuje cały łuk (budynek + cel)
   const handleFocusDestination = (route: CommuteRouteResult) => {
-    if (!mapRef.current || !activeOriginBuilding) return;
+    const map = mapRef.current;
+    if (!map || !activeOriginBuilding) return;
 
-    // Wyznaczamy środek trasy do płynnego objęcia wzrokiem
-    const midLng = (activeOriginBuilding.coordinates[0] + route.coordinates[0]) / 2;
-    const midLat = (activeOriginBuilding.coordinates[1] + route.coordinates[1]) / 2;
+    const bounds = new maplibregl.LngLatBounds();
+    bounds.extend(activeOriginBuilding.coordinates);
+    bounds.extend(route.coordinates);
 
-    mapRef.current.flyTo({
-      center: [midLng, midLat],
-      zoom: 15.2,
-      pitch: 58,
-      duration: 1600,
+    const targetPitch = 55;
+    // Rezerwa miejsca: panel HUD po prawej, unoszący się łuk u góry, pigułka celu u dołu
+    const padding = {
+      top: 260,
+      bottom: 130,
+      left: 110,
+      right: window.innerWidth >= 640 ? 420 : 340,
+    };
+
+    const camera = map.cameraForBounds(bounds, { bearing: map.getBearing(), padding });
+
+    // Zapas zoomu, bo cameraForBounds liczy dopasowanie bez pochylenia kamery;
+    // limit 16 chroni przed absurdalnym przybliżeniem dla celów w tym samym punkcie
+    const fittedZoom = (camera?.zoom ?? map.getZoom()) - 0.5;
+
+    map.flyTo({
+      center: camera?.center ?? bounds.getCenter(),
+      zoom: Math.min(fittedZoom, 16),
+      bearing: camera?.bearing ?? map.getBearing(),
+      pitch: targetPitch,
+      duration: 1400,
       essential: true,
     });
   };
