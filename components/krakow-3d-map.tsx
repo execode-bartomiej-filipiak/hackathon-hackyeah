@@ -28,6 +28,7 @@ import {
 } from '@/lib/commute';
 import { CommuteHud } from '@/components/commute-hud';
 import { AddDestinationDialog } from '@/components/add-destination-dialog';
+import { AddressSearch, type SearchResultItem } from '@/components/address-search';
 import type {
   CommuteProfile,
   TravelMode,
@@ -1495,6 +1496,56 @@ export function Krakow3DMap() {
   };
 
 
+  // Przekierowanie mapy i wskazanie punktu z wyszukiwarki adresów
+  const handleSelectSearchResult = (item: SearchResultItem) => {
+    if (!mapRef.current) return;
+
+    mapRef.current.flyTo({
+      center: item.coordinates,
+      zoom: 16.6,
+      pitch: 62,
+      bearing: -20,
+      essential: true,
+      duration: 1800,
+    });
+
+    const buildingInfo: SelectedBuildingInfo = {
+      name: item.name || item.address,
+      district: item.district,
+      coordinates: item.coordinates,
+    };
+    setSelectedBuilding(buildingInfo);
+
+    if (popupRef.current) {
+      popupRef.current.remove();
+    }
+
+    const popupElement = document.createElement('div');
+    popupElement.className = 'p-1 text-slate-900 font-sans';
+    popupElement.innerHTML = `
+      <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
+        <span>📍</span> <span class="building-address-title">${item.address || item.name}</span>
+      </div>
+      <div style="font-size: 11px; color: #475569;">
+        Dzielnica: <strong style="color: #0f172a;" class="building-district-text">${item.district}</strong>
+      </div>
+    `;
+
+    popupRef.current = new maplibregl.Popup({
+      offset: [0, -12],
+      closeButton: true,
+      closeOnClick: false,
+      className: 'krakow-map-popup',
+    })
+      .setLngLat(item.coordinates)
+      .setDOMContent(popupElement)
+      .addTo(mapRef.current);
+
+    popupRef.current.on('close', () => {
+      handleClearSelection();
+    });
+  };
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
       {/* KONTENER MAPY WEBGL - 100% EKRANU */}
@@ -1571,44 +1622,47 @@ export function Krakow3DMap() {
         </div>
       )}
 
-      {/* PŁYWAJĄCY PASEK KONTROLI KAMERY 3D (LEWY GÓRNY RÓG) */}
-      <div className="absolute top-4 left-14 z-20 flex flex-wrap items-center gap-2 bg-background/90 backdrop-blur-md p-2 rounded-xl border border-border/80 shadow-lg">
-        <Button
-          variant={isRotating ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setIsRotating(!isRotating)}
-          className="text-xs h-7 px-2.5 gap-1.5 font-medium"
-        >
-          <RotateCwIcon className={`size-3.5 ${isRotating ? 'animate-spin' : ''}`} />
-          {isRotating ? 'Zatrzymaj' : 'Obrót 360°'}
-        </Button>
+      {/* PŁYWAJĄCY PASEK KONTROLI KAMERY 3D ORAZ WYSZUKIWARKA ADRESÓW (LEWY GÓRNY RÓG) */}
+      <div className="absolute top-4 left-14 z-20 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 bg-background/90 backdrop-blur-md p-2 rounded-xl border border-border/80 shadow-lg">
+          <Button
+            variant={isRotating ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setIsRotating(!isRotating)}
+            className="text-xs h-7 px-2.5 gap-1.5 font-medium"
+          >
+            <RotateCwIcon className={`size-3.5 ${isRotating ? 'animate-spin' : ''}`} />
+            {isRotating ? 'Zatrzymaj' : 'Obrót 360°'}
+          </Button>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleCenterOnSelectedBuilding}
-          disabled={!activeOriginBuilding}
-          className="size-7 p-0 disabled:opacity-50"
-          title={activeOriginBuilding ? `Wycentruj na: ${activeOriginBuilding.name}` : 'Wskaż miejsce zamieszkania lub budynek na mapie'}
-          aria-label="Centruj na wybranym punkcie"
-        >
-          <LocateFixedIcon className="size-3.5 text-primary" />
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCenterOnSelectedBuilding}
+            disabled={!activeOriginBuilding}
+            className="size-7 p-0 disabled:opacity-50"
+            title={activeOriginBuilding ? `Wycentruj na: ${activeOriginBuilding.name}` : 'Wskaż miejsce zamieszkania lub budynek na mapie'}
+            aria-label="Centruj na wybranym punkcie"
+          >
+            <LocateFixedIcon className="size-3.5 text-primary" />
+          </Button>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            if (mapRef.current) {
-              mapRef.current.easeTo({ pitch: 62, bearing: -20 });
-            }
-          }}
-          className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
-        >
-          Reset
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (mapRef.current) {
+                mapRef.current.easeTo({ pitch: 62, bearing: -20 });
+              }
+            }}
+            className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
+          >
+            Reset
+          </Button>
+        </div>
+
+        <AddressSearch onSelectLocation={handleSelectSearchResult} />
       </div>
-
       {/* PŁYWAJĄCY PANEL COMMUTE HUD (PRAWY GÓRNY RÓG) */}
       <CommuteHud
         activeProfile={currentProfile}
