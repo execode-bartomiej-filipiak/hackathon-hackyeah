@@ -1054,7 +1054,7 @@ export function Krakow3DMap() {
 
     // 2. Efektowny wskaźnik przestrzenny 3D — spójny z językiem wizualnym paneli HUD
     const isHome = pointType === 'home';
-    const highlightColor = isHome ? '#f59e0b' : '#0ea5e9';
+    const highlightColor = isHome ? '#f59e0b' : '#3b82f6';
     const accent = isHome
       ? {
           border: 'border-amber-400/45',
@@ -1068,15 +1068,15 @@ export function Krakow3DMap() {
           core: 'bg-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.9)]',
         }
       : {
-          border: 'border-sky-400/45',
-          glow: 'shadow-[0_0_18px_rgba(56,189,248,0.28)]',
-          iconBg: 'bg-sky-500/15 text-sky-300 border border-sky-400/25',
-          dotBg: 'bg-sky-400',
-          subColor: 'text-sky-300',
-          pointer: 'border-t-sky-400/80',
-          stem: 'bg-gradient-to-b from-sky-400 to-sky-500/20 shadow-[0_0_6px_rgba(56,189,248,0.7)]',
-          ping: 'border-sky-400 bg-sky-400/25',
-          core: 'bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.9)]',
+          border: 'border-blue-400/45',
+          glow: 'shadow-[0_0_18px_rgba(59,130,246,0.28)]',
+          iconBg: 'bg-blue-500/15 text-blue-300 border border-blue-400/25',
+          dotBg: 'bg-blue-400',
+          subColor: 'text-blue-300',
+          pointer: 'border-t-blue-400/80',
+          stem: 'bg-gradient-to-b from-blue-400 to-blue-500/20 shadow-[0_0_6px_rgba(59,130,246,0.7)]',
+          ping: 'border-blue-400 bg-blue-400/25',
+          core: 'bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.9)]',
         };
     const typeLabel = isHome ? 'Miejsce zamieszkania' : 'Miejsce odniesienia';
     const typeEmoji = isHome ? '🏠' : '🏢';
