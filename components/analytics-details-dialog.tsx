@@ -15,10 +15,6 @@ import {
   LeafIcon,
   TrendingDownIcon,
   TrendingUpIcon,
-  TrainIcon,
-  CarIcon,
-  BikeIcon,
-  FootprintsIcon,
   SparklesIcon,
   CheckCircle2Icon,
 } from 'lucide-react';
@@ -122,6 +118,11 @@ export function AnalyticsDetailsDialog({
                 {analysis.totalHoursPerWeek} h
                 <span className="text-xs font-normal text-muted-foreground ml-1">/ tydzień</span>
               </div>
+
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Każda wizyta liczona jest w obie strony (dojazd + powrót), czyli podany czas jednorazowy
+                mnożymy przez liczbę wizyt w tygodniu i przez 2.
+              </p>
 
               <div className="pt-2 border-t border-border/50 text-[11px] space-y-1 text-muted-foreground">
                 {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (

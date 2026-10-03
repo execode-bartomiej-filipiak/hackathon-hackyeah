@@ -572,7 +572,15 @@ export function CommuteHud({
               {/* LISTA PUNKTÓW DOCELOWYCH */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
-                  <span>Cele ({analysis.routes.length}):</span>
+                  <span className="flex items-center gap-1.5">
+                    <span>Cele ({analysis.routes.length}):</span>
+                    <span
+                      className="text-[9px] font-medium text-muted-foreground/80 border border-border/70 rounded-full px-1.5 py-0.5 leading-none"
+                      title="Podany czas dotyczy jednego przejazdu. Bilans tygodniowy liczy dojazd i powrót (×2) dla każdej wizyty."
+                    >
+                      ×2 tam i z powrotem
+                    </span>
+                  </span>
                   {selectedBuildingName && (
                     <span className="font-normal truncate max-w-[130px] text-foreground">
                       Z: {selectedBuildingName}
