@@ -51,6 +51,62 @@ interface PendingNewDestination {
   district: string;
 }
 
+// Spójny językiem wizualnym z panelami HUD: ciemne szkło + akcent kolorystyczny statusu
+const DESTINATION_PIN_STYLES: Record<
+  'optimal' | 'moderate' | 'heavy' | 'none',
+  {
+    border: string;
+    glow: string;
+    iconBg: string;
+    chip: string;
+    pointer: string;
+    stem: string;
+    ping: string;
+    core: string;
+  }
+> = {
+  optimal: {
+    border: 'border-emerald-400/45',
+    glow: 'shadow-[0_0_18px_rgba(16,185,129,0.28)]',
+    iconBg: 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/25',
+    chip: 'bg-emerald-500/15 text-emerald-300',
+    pointer: 'border-t-emerald-400/80',
+    stem: 'bg-gradient-to-b from-emerald-400 to-emerald-500/20 shadow-[0_0_6px_rgba(16,185,129,0.7)]',
+    ping: 'border-emerald-400 bg-emerald-400/25',
+    core: 'bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.9)]',
+  },
+  moderate: {
+    border: 'border-amber-400/45',
+    glow: 'shadow-[0_0_18px_rgba(245,158,11,0.28)]',
+    iconBg: 'bg-amber-500/15 text-amber-300 border border-amber-400/25',
+    chip: 'bg-amber-500/15 text-amber-300',
+    pointer: 'border-t-amber-400/80',
+    stem: 'bg-gradient-to-b from-amber-400 to-amber-500/20 shadow-[0_0_6px_rgba(245,158,11,0.7)]',
+    ping: 'border-amber-400 bg-amber-400/25',
+    core: 'bg-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.9)]',
+  },
+  heavy: {
+    border: 'border-rose-400/45',
+    glow: 'shadow-[0_0_18px_rgba(244,63,94,0.28)]',
+    iconBg: 'bg-rose-500/15 text-rose-300 border border-rose-400/25',
+    chip: 'bg-rose-500/15 text-rose-300',
+    pointer: 'border-t-rose-400/80',
+    stem: 'bg-gradient-to-b from-rose-400 to-rose-500/20 shadow-[0_0_6px_rgba(244,63,94,0.7)]',
+    ping: 'border-rose-400 bg-rose-400/25',
+    core: 'bg-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.9)]',
+  },
+  none: {
+    border: 'border-slate-400/40',
+    glow: 'shadow-[0_0_18px_rgba(148,163,184,0.25)]',
+    iconBg: 'bg-slate-500/15 text-slate-300 border border-slate-400/25',
+    chip: 'bg-slate-500/15 text-slate-300',
+    pointer: 'border-t-slate-400/80',
+    stem: 'bg-gradient-to-b from-slate-400 to-slate-500/20 shadow-[0_0_6px_rgba(148,163,184,0.7)]',
+    ping: 'border-slate-400 bg-slate-400/25',
+    core: 'bg-slate-300 shadow-[0_0_10px_rgba(148,163,184,0.9)]',
+  },
+};
+
 function getDistrict(lng: number, lat: number): string {
   const distRynek = Math.hypot(lng - 19.9373, lat - 50.0617);
   const distWawel = Math.hypot(lng - 19.9354, lat - 50.0540);
@@ -325,27 +381,31 @@ export function Krakow3DMap() {
 
       destinations.forEach((dest) => {
         const route = routes.find((r) => r.destinationId === dest.id);
+        const pin = DESTINATION_PIN_STYLES[route?.status ?? 'none'];
         const el = document.createElement('div');
         el.className = 'commute-destination-marker cursor-pointer select-none group';
-
-        const statusBg =
-          route?.status === 'optimal'
-            ? 'bg-emerald-600 text-white'
-            : route?.status === 'moderate'
-            ? 'bg-amber-600 text-white'
-            : route?.status === 'heavy'
-            ? 'bg-rose-600 text-white'
-            : 'bg-primary text-primary-foreground';
         el.title = `${dest.name}${route ? ` (${route.durationMinutes} min)` : ''}`;
         el.innerHTML = `
-          <div class="flex items-center gap-1.5 px-3 py-1 rounded-full shadow-xl border border-white/40 backdrop-blur-md ${statusBg} text-xs font-semibold transition-transform group-hover:scale-105 whitespace-nowrap">
-            <span class="text-sm shrink-0">${dest.icon}</span>
-            <span class="max-w-[200px] sm:max-w-[280px] truncate">${dest.name}</span>
-            ${
-              route
-                ? `<span class="bg-black/35 px-1.5 py-0.5 rounded-full text-[10px] font-bold tracking-tight shrink-0">${route.durationMinutes}m</span>`
-                : ''
-            }
+          <div class="flex flex-col items-center">
+            <div class="relative flex items-center gap-2 pl-1.5 pr-2 py-1 rounded-2xl bg-slate-950/90 backdrop-blur-xl border ${pin.border} ${pin.glow} transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-0.5 whitespace-nowrap">
+              <span class="size-6 rounded-lg flex items-center justify-center text-sm shrink-0 ${pin.iconBg}">
+                ${dest.icon}
+              </span>
+              <span class="text-[11px] font-bold text-white truncate max-w-[140px] sm:max-w-[190px]">
+                ${dest.name}
+              </span>
+              ${
+                route
+                  ? `<span class="text-[10px] font-bold tracking-tight px-1.5 py-0.5 rounded-full ${pin.chip} shrink-0">${route.durationMinutes}m</span>`
+                  : ''
+              }
+            </div>
+            <div class="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[6px] ${pin.pointer}"></div>
+            <div class="w-0.5 h-3 ${pin.stem}"></div>
+            <div class="relative flex items-center justify-center size-4 -mt-2">
+              <div class="absolute size-4 rounded-full border ${pin.ping} animate-ping"></div>
+              <div class="size-2 rounded-full ${pin.core}"></div>
+            </div>
           </div>
         `;
 
@@ -362,7 +422,7 @@ export function Krakow3DMap() {
 
         el.style.zIndex = '6';
 
-        const marker = new maplibregl.Marker({ element: el })
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat(dest.coordinates)
           .addTo(map);
 
@@ -992,23 +1052,32 @@ export function Krakow3DMap() {
       isSwitchingBuildingRef.current = false;
     }
 
-    // 2. Utworzenie efektownego wskaźnika przestrzennego 3D (Spatial HUD Beacon)
+    // 2. Efektowny wskaźnik przestrzenny 3D — spójny z językiem wizualnym paneli HUD
     const isHome = pointType === 'home';
-    const highlightColor = isHome ? '#f59e0b' : '#3b82f6';
-    const badgeBorder = isHome
-      ? 'border-amber-400/60 shadow-[0_0_24px_rgba(245,158,11,0.45)]'
-      : 'border-blue-400/60 shadow-[0_0_24px_rgba(59,130,246,0.45)]';
-    const iconBg = isHome
-      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-      : 'bg-blue-500/20 text-blue-400 border border-blue-500/40';
-    const dotBg = isHome ? 'bg-amber-400' : 'bg-blue-400';
-    const subColor = isHome ? 'text-amber-400' : 'text-blue-400';
-    const pointerBorder = isHome ? 'border-t-amber-500/80' : 'border-t-blue-500/80';
-    const stemGradient = isHome
-      ? 'bg-gradient-to-b from-amber-400 to-amber-500/20 shadow-[0_0_8px_#f59e0b]'
-      : 'bg-gradient-to-b from-blue-400 to-blue-500/20 shadow-[0_0_8px_#3b82f6]';
-    const beaconPing = isHome ? 'border-amber-400 bg-amber-400/30' : 'border-blue-400 bg-blue-400/30';
-    const beaconCore = isHome ? 'bg-amber-400 shadow-[0_0_12px_#f59e0b]' : 'bg-blue-400 shadow-[0_0_12px_#3b82f6]';
+    const highlightColor = isHome ? '#f59e0b' : '#0ea5e9';
+    const accent = isHome
+      ? {
+          border: 'border-amber-400/45',
+          glow: 'shadow-[0_0_18px_rgba(245,158,11,0.28)]',
+          iconBg: 'bg-amber-500/15 text-amber-300 border border-amber-400/25',
+          dotBg: 'bg-amber-400',
+          subColor: 'text-amber-300',
+          pointer: 'border-t-amber-400/80',
+          stem: 'bg-gradient-to-b from-amber-400 to-amber-500/20 shadow-[0_0_6px_rgba(245,158,11,0.7)]',
+          ping: 'border-amber-400 bg-amber-400/25',
+          core: 'bg-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.9)]',
+        }
+      : {
+          border: 'border-sky-400/45',
+          glow: 'shadow-[0_0_18px_rgba(56,189,248,0.28)]',
+          iconBg: 'bg-sky-500/15 text-sky-300 border border-sky-400/25',
+          dotBg: 'bg-sky-400',
+          subColor: 'text-sky-300',
+          pointer: 'border-t-sky-400/80',
+          stem: 'bg-gradient-to-b from-sky-400 to-sky-500/20 shadow-[0_0_6px_rgba(56,189,248,0.7)]',
+          ping: 'border-sky-400 bg-sky-400/25',
+          core: 'bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.9)]',
+        };
     const typeLabel = isHome ? 'Miejsce zamieszkania' : 'Miejsce odniesienia';
     const typeEmoji = isHome ? '🏠' : '🏢';
 
@@ -1016,18 +1085,18 @@ export function Krakow3DMap() {
     indicatorEl.className = 'krakow-3d-spatial-indicator group select-none pointer-events-auto cursor-pointer flex flex-col items-center';
     indicatorEl.style.zIndex = '7';
     indicatorEl.innerHTML = `
-      <div class="relative flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-slate-950/90 backdrop-blur-xl ${badgeBorder} border transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1">
-        <div class="size-7 sm:size-8 rounded-xl flex items-center justify-center shrink-0 ${iconBg} text-base">
+      <div class="relative flex items-center gap-2.5 pl-1.5 pr-2 py-1 rounded-2xl bg-slate-950/90 backdrop-blur-xl ${accent.border} ${accent.glow} border transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1">
+        <div class="size-7 sm:size-8 rounded-lg flex items-center justify-center shrink-0 ${accent.iconBg} text-base">
           ${typeEmoji}
         </div>
         <div class="min-w-0 flex-1 pr-1">
           <div class="flex items-center gap-1.5">
-            <span class="size-1.5 rounded-full ${dotBg} animate-pulse"></span>
-            <span class="text-[9px] uppercase font-bold tracking-wider ${subColor}">
+            <span class="size-1.5 rounded-full ${accent.dotBg} animate-pulse"></span>
+            <span class="text-[9px] uppercase font-bold tracking-wider ${accent.subColor}">
               ${typeLabel}
             </span>
           </div>
-          <div class="text-xs font-bold text-white truncate max-w-[170px] sm:max-w-[220px] indicator-address-title leading-tight mt-0.5">
+          <div class="text-[11px] sm:text-xs font-bold text-white truncate max-w-[170px] sm:max-w-[220px] indicator-address-title leading-tight mt-0.5">
             ${building.name}
           </div>
           <div class="text-[10px] text-slate-400 truncate indicator-district-text">
@@ -1040,11 +1109,11 @@ export function Krakow3DMap() {
           </svg>
         </button>
       </div>
-      <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[7px] ${pointerBorder} -mt-[1px]"></div>
-      <div class="w-0.5 h-6 ${stemGradient}"></div>
+      <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[7px] ${accent.pointer} -mt-[1px]"></div>
+      <div class="w-0.5 h-6 ${accent.stem}"></div>
       <div class="relative flex items-center justify-center size-5 -mt-2.5">
-        <div class="absolute size-5 rounded-full border-2 ${beaconPing} animate-ping"></div>
-        <div class="size-2.5 rounded-full ${beaconCore}"></div>
+        <div class="absolute size-5 rounded-full border-2 ${accent.ping} animate-ping"></div>
+        <div class="size-2.5 rounded-full ${accent.core}"></div>
       </div>
     `;
 
