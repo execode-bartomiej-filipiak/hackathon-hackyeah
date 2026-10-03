@@ -4,6 +4,7 @@ export const revalidate = 0;
 import { isDemoMode } from '@/lib/demo';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { HackathonLaunchpad } from '@/components/hackathon-launchpad';
+import { Krakow3DMap } from '@/components/krakow-3d-map';
 import { RecordsPreview } from '@/components/records-preview';
 import { getRecords } from '@/lib/data/records';
 import { Code2Icon } from 'lucide-react';
@@ -36,6 +37,7 @@ export default async function HomePage() {
       {/* GŁÓWNA ZAWARTOŚĆ */}
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-10">
         <div className="space-y-8">
+          <Krakow3DMap />
           <RecordsPreview
             initialRecords={records}
             source={source}
