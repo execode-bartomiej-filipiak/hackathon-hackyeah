@@ -11,21 +11,15 @@ import type {
   LayerSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import {
   CompassIcon,
-  LayersIcon,
   Maximize2Icon,
   RotateCwIcon,
-  KeyIcon,
   Building2Icon,
   MapPinIcon,
   RulerIcon,
   InfoIcon,
-  SparklesIcon,
   XIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -39,72 +33,7 @@ interface SelectedBuildingInfo {
   coordinates: [number, number];
 }
 
-interface Landmark {
-  name: string;
-  icon: string;
-  center: [number, number];
-  zoom: number;
-  pitch: number;
-  bearing: number;
-  district: string;
-}
 
-const KRAKOW_LANDMARKS: Landmark[] = [
-  {
-    name: 'Rynek Główny & Sukiennice',
-    icon: '🏛️',
-    center: [19.9373, 50.0617],
-    zoom: 16.5,
-    pitch: 62,
-    bearing: -20,
-    district: 'Stare Miasto',
-  },
-  {
-    name: 'Wawel (Zamek Królewski)',
-    icon: '🏰',
-    center: [19.9354, 50.0540],
-    zoom: 16.3,
-    pitch: 65,
-    bearing: 45,
-    district: 'Wzgórze Wawelskie',
-  },
-  {
-    name: 'Kościół Mariacki',
-    icon: '⛪',
-    center: [19.9394, 50.0616],
-    zoom: 17.0,
-    pitch: 65,
-    bearing: 65,
-    district: 'Stare Miasto',
-  },
-  {
-    name: 'Kazimierz (Plac Nowy)',
-    icon: '🕍',
-    center: [19.9450, 50.0520],
-    zoom: 16.5,
-    pitch: 58,
-    bearing: 25,
-    district: 'Kazimierz',
-  },
-  {
-    name: 'Unity Tower (Szkieletor)',
-    icon: '🏢',
-    center: [19.9575, 50.0680],
-    zoom: 16.5,
-    pitch: 68,
-    bearing: -15,
-    district: 'Grzegórzki',
-  },
-  {
-    name: 'Tauron Arena Kraków',
-    icon: '🏟️',
-    center: [19.9922, 50.0681],
-    zoom: 16.0,
-    pitch: 60,
-    bearing: -35,
-    district: 'Czyżyny',
-  },
-];
 
 function getDistrict(lng: number, lat: number): string {
   const distRynek = Math.hypot(lng - 19.9373, lat - 50.0617);
@@ -133,7 +62,7 @@ export function Krakow3DMap() {
   const [bearing, setBearing] = useState(-20);
   const [isRotating, setIsRotating] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
-  const [showTokenDialog, setShowTokenDialog] = useState(false);
+
   const [engineType, setEngineType] = useState<'openfreemap' | 'mapbox'>('openfreemap');
 
   // Sprawdzamy zapisany token Mapbox
@@ -388,20 +317,7 @@ export function Krakow3DMap() {
     };
   }, [isRotating]);
 
-  // Skok do zabytku
-  const handleFlyTo = (landmark: Landmark) => {
-    if (!mapRef.current) return;
-    setIsRotating(false);
-    mapRef.current.flyTo({
-      center: landmark.center,
-      zoom: landmark.zoom,
-      pitch: landmark.pitch,
-      bearing: landmark.bearing,
-      essential: true,
-      duration: 2200,
-    });
-    toast.success(`Lot kamery do: ${landmark.name}`);
-  };
+
 
   // Reset zaznaczenia
   const handleClearSelection = () => {
@@ -422,258 +338,144 @@ export function Krakow3DMap() {
     }
   };
 
-  // Zapis klucza Mapbox
-  const handleSaveToken = () => {
-    const trimmed = tokenInput.trim();
-    if (trimmed && !trimmed.startsWith('pk.')) {
-      toast.error('Nieprawidłowy token Mapbox. Publiczny klucz powinien zaczynać się od pk.');
-      return;
-    }
 
-    if (trimmed) {
-      localStorage.setItem('krakow_mapbox_token', trimmed);
-      setEngineType('mapbox');
-      setShowTokenDialog(false);
-      toast.success('Zapisano klucz Mapbox! Przełączono styl na Mapbox Dark 3D.');
-    } else {
-      localStorage.removeItem('krakow_mapbox_token');
-      setEngineType('openfreemap');
-      setShowTokenDialog(false);
-      toast.info('Przywrócono domyślny otwarty silnik 3D (OpenFreeMap).');
-    }
-  };
 
   return (
-    <Card className="border-border shadow-md overflow-hidden">
-      <CardHeader className="pb-3 border-b border-border bg-card/60">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="flex size-2.5 rounded-full bg-primary animate-pulse" />
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <span>Kraków 3D</span>
-                <Badge variant="outline" className="text-xs font-mono">
-                  Mapbox / WebGL 3D PoC
-                </Badge>
-              </CardTitle>
+    <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
+      {/* KONTENER MAPY WEBGL - 100% EKRANU */}
+      <div
+        ref={mapContainerRef}
+        className="w-full h-full bg-slate-950"
+        style={{ cursor: 'grab' }}
+      />
+
+      {/* STAN ŁADOWANIA */}
+      {!mapLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-xs z-30">
+          <div className="text-center space-y-2">
+            <div className="size-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="text-xs font-medium text-foreground">Inicjalizacja 3D Kraków WebGL...</div>
+            <div className="text-[11px] text-muted-foreground">Ładowanie brył budynków i siatki terenu</div>
+          </div>
+        </div>
+      )}
+
+      {/* PŁYWAJĄCY PASEK KONTROLI KAMERY 3D */}
+      <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-2 bg-background/90 backdrop-blur-md p-2 rounded-lg border border-border shadow-md">
+        <Button
+          variant={isRotating ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setIsRotating(!isRotating)}
+          className="text-xs h-7 px-2 gap-1.5"
+        >
+          <RotateCwIcon className={`size-3.5 ${isRotating ? 'animate-spin' : ''}`} />
+          {isRotating ? 'Zatrzymaj obrót' : 'Obrót 360°'}
+        </Button>
+
+        <div className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono text-muted-foreground border-l border-border">
+          <CompassIcon className="size-3.5 text-primary" />
+          <span>Kąt: {pitch}°</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono text-muted-foreground border-l border-border">
+          <span>Azymut: {bearing}°</span>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (mapRef.current) {
+              mapRef.current.easeTo({ pitch: 62, bearing: -20 });
+            }
+          }}
+          className="text-xs h-7 px-2"
+        >
+          Reset
+        </Button>
+      </div>
+
+      {/* PŁYWAJĄCA KARTA WYBRANEGO BUDYNKU 3D */}
+      {selectedBuilding && (
+        <div className="absolute bottom-4 left-4 z-20 max-w-sm w-full bg-background/95 backdrop-blur-md p-4 rounded-xl border border-primary/40 shadow-xl space-y-3 animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 text-xs text-primary font-semibold">
+                <Building2Icon className="size-3.5" />
+                <span>Zaznaczony Budynek 3D</span>
+              </div>
+              <h4 className="font-bold text-sm text-foreground line-clamp-1">
+                {selectedBuilding.name}
+              </h4>
             </div>
-            <CardDescription className="text-xs">
-              Interaktywna bryłowa wizualizacja 3D z możliwością zaznaczania dowolnego budynku i odczytu parametrów.
-            </CardDescription>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearSelection}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            >
+              <XIcon className="size-4" />
+            </Button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <RulerIcon className="size-3" /> Wysokość bryły
+              </span>
+              <div className="font-bold text-sm text-foreground">
+                {selectedBuilding.height} m
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                ~{selectedBuilding.levels} kondygnacji
+              </span>
+            </div>
+
+            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <MapPinIcon className="size-3" /> Dzielnica
+              </span>
+              <div className="font-bold text-xs text-foreground">
+                {selectedBuilding.district}
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                {selectedBuilding.type}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {selectedBuilding.coordinates[1].toFixed(5)}°N, {selectedBuilding.coordinates[0].toFixed(5)}°E
+            </span>
+
+            <Button
               variant="secondary"
-              className="text-xs gap-1.5 py-1 px-2.5 bg-primary/10 text-primary border border-primary/20"
-            >
-              <LayersIcon className="size-3.5" />
-              Silnik: {engineType === 'mapbox' ? 'Mapbox GL (Klucz aktywny)' : 'OpenFreeMap 3D (Bez klucza)'}
-            </Badge>
-
-            <Button
-              variant="outline"
               size="sm"
-              onClick={() => setShowTokenDialog(!showTokenDialog)}
-              className="text-xs h-8 gap-1.5"
+              onClick={() => {
+                if (mapRef.current) {
+                  mapRef.current.flyTo({
+                    center: selectedBuilding.coordinates,
+                    zoom: 17.5,
+                    pitch: 70,
+                    essential: true,
+                  });
+                }
+              }}
+              className="text-xs h-7 gap-1"
             >
-              <KeyIcon className="size-3.5" />
-              {engineType === 'mapbox' ? 'Zmień klucz Mapbox' : 'Wprowadź klucz Mapbox'}
+              <Maximize2Icon className="size-3" />
+              Przybliż
             </Button>
           </div>
         </div>
+      )}
 
-        {/* DIALOG WPISANIA KLUCZA MAPBOX */}
-        {showTokenDialog && (
-          <div className="mt-3 p-3 rounded-lg border border-primary/30 bg-primary/5 text-xs space-y-2.5 animate-in fade-in">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-foreground flex items-center gap-1.5">
-                <KeyIcon className="size-3.5 text-primary" />
-                Konfiguracja oficjalnego tokena Mapbox (opcjonalnie):
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowTokenDialog(false)}
-                className="h-6 w-6 p-0"
-              >
-                <XIcon className="size-3.5" />
-              </Button>
-            </div>
-            <p className="text-muted-foreground text-[11px]">
-              Domyślnie mapa działa natychmiast z darmowym silnikiem wektorowym 3D. Jeśli posiadasz własny klucz Mapbox (zaczynający się od <code>pk.eyJ...</code>), wklej go poniżej:
-            </p>
-            <div className="flex gap-2">
-              <Input
-                placeholder="pk.eyJ1I..."
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                className="text-xs h-8 bg-background font-mono"
-              />
-              <Button size="sm" onClick={handleSaveToken} className="text-xs h-8">
-                Zapisz
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* PRZYCISKI SZYBKIEGO SKOKU PO KRAKOWIE */}
-        <div className="pt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1 mr-1">
-            <SparklesIcon className="size-3 text-amber-500" />
-            Szybki skok:
-          </span>
-          {KRAKOW_LANDMARKS.map((item) => (
-            <Button
-              key={item.name}
-              variant="outline"
-              size="sm"
-              onClick={() => handleFlyTo(item)}
-              className="text-xs h-7 px-2.5 gap-1.5 hover:border-primary/50"
-            >
-              <span>{item.icon}</span>
-              <span>{item.name}</span>
-            </Button>
-          ))}
-        </div>
-      </CardHeader>
-
-      <CardContent className="p-0 relative">
-        {/* KONTENER MAPY WEBGL */}
-        <div
-          ref={mapContainerRef}
-          className="w-full h-[540px] bg-slate-950 relative"
-          style={{ cursor: 'grab' }}
-        />
-
-        {/* STAN ŁADOWANIA */}
-        {!mapLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-xs z-10">
-            <div className="text-center space-y-2">
-              <div className="size-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-              <div className="text-xs font-medium text-foreground">Inicjalizacja 3D Kraków WebGL...</div>
-              <div className="text-[11px] text-muted-foreground">Ładowanie brył budynków i siatki terenu</div>
-            </div>
-          </div>
-        )}
-
-        {/* PŁYWAJĄCY PASEK KONTROLI KAMERY 3D */}
-        <div className="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2 bg-background/90 backdrop-blur-md p-2 rounded-lg border border-border shadow-md">
-          <Button
-            variant={isRotating ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setIsRotating(!isRotating)}
-            className="text-xs h-7 px-2 gap-1.5"
-          >
-            <RotateCwIcon className={`size-3.5 ${isRotating ? 'animate-spin' : ''}`} />
-            {isRotating ? 'Zatrzymaj obrót' : 'Obrót 360°'}
-          </Button>
-
-          <div className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono text-muted-foreground border-l border-border">
-            <CompassIcon className="size-3.5 text-primary" />
-            <span>Kąt: {pitch}°</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono text-muted-foreground border-l border-border">
-            <span>Azymut: {bearing}°</span>
-          </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (mapRef.current) {
-                mapRef.current.easeTo({ pitch: 62, bearing: -20 });
-              }
-            }}
-            className="text-xs h-7 px-2"
-          >
-            Reset
-          </Button>
-        </div>
-
-        {/* PŁYWAJĄCA KARTA WYBRANEGO BUDYNKU 3D */}
-        {selectedBuilding && (
-          <div className="absolute bottom-4 left-4 z-20 max-w-sm w-full bg-background/95 backdrop-blur-md p-4 rounded-xl border border-primary/40 shadow-xl space-y-3 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-                  <Building2Icon className="size-3.5" />
-                  <span>Zaznaczony Budynek 3D</span>
-                </div>
-                <h4 className="font-bold text-sm text-foreground line-clamp-1">
-                  {selectedBuilding.name}
-                </h4>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearSelection}
-                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-              >
-                <XIcon className="size-4" />
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
-                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <RulerIcon className="size-3" /> Wysokość bryły
-                </span>
-                <div className="font-bold text-sm text-foreground">
-                  {selectedBuilding.height} m
-                </div>
-                <span className="text-[10px] text-muted-foreground">
-                  ~{selectedBuilding.levels} kondygnacji
-                </span>
-              </div>
-
-              <div className="rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
-                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <MapPinIcon className="size-3" /> Dzielnica
-                </span>
-                <div className="font-bold text-xs text-foreground">
-                  {selectedBuilding.district}
-                </div>
-                <span className="text-[10px] text-muted-foreground">
-                  {selectedBuilding.type}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {selectedBuilding.coordinates[1].toFixed(5)}°N, {selectedBuilding.coordinates[0].toFixed(5)}°E
-              </span>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  if (mapRef.current) {
-                    mapRef.current.flyTo({
-                      center: selectedBuilding.coordinates,
-                      zoom: 17.5,
-                      pitch: 70,
-                      essential: true,
-                    });
-                  }
-                }}
-                className="text-xs h-7 gap-1"
-              >
-                <Maximize2Icon className="size-3" />
-                Przybliż
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* INSTRUKCJA NA MAPIE */}
-        <div className="absolute bottom-3 right-3 z-10 pointer-events-none hidden sm:flex items-center gap-1.5 bg-background/80 backdrop-blur-xs px-2.5 py-1 rounded-md border border-border text-[11px] text-muted-foreground">
-          <InfoIcon className="size-3.5 text-primary" />
-          <span>Kliknij dowolny budynek, aby go zaznaczyć i wyświetlić parametry 3D.</span>
-        </div>
-      </CardContent>
-    </Card>
+      {/* INSTRUKCJA DLA UŻYTKOWNIKA */}
+      <div className="absolute bottom-3 right-3 z-10 pointer-events-none hidden sm:flex items-center gap-1.5 bg-background/85 backdrop-blur-xs px-2.5 py-1 rounded-md border border-border text-[11px] text-muted-foreground shadow-sm">
+        <InfoIcon className="size-3.5 text-primary" />
+        <span>Kliknij dowolny budynek w 3D, aby go zaznaczyć i wyświetlić parametry.</span>
+      </div>
+    </div>
   );
 }
