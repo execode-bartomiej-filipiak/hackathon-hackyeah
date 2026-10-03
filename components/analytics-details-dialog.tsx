@@ -209,7 +209,6 @@ export function AnalyticsDetailsDialog({
         <DialogHeader className="space-y-1.5 border-b border-border/60 pb-3">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
             <SparklesIcon className="size-3.5 text-amber-500" />
-            <span>Raport Mobilności & Ekologii 3D</span>
           </div>
           <DialogTitle className="text-lg font-bold text-foreground">
             Szczegółowa analityka dojazdów miejskich
@@ -282,11 +281,10 @@ export function AnalyticsDetailsDialog({
                         role="tab"
                         aria-selected={isActive}
                         onClick={() => setHorizonId(item.id)}
-                        className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-md transition-colors cursor-pointer ${
-                          isActive
-                            ? 'bg-background text-foreground shadow-xs'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                        className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-md transition-colors cursor-pointer ${isActive
+                          ? 'bg-background text-foreground shadow-xs'
+                          : 'text-muted-foreground hover:text-foreground'
+                          }`}
                       >
                         {item.label}
                       </button>
@@ -333,11 +331,10 @@ export function AnalyticsDetailsDialog({
                           {formatValue(row.next * factor, row.decimals)} {row.unit}
                         </td>
                         <td
-                          className={`px-3.5 py-2 text-right font-bold ${
-                            improves
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-rose-500'
-                          }`}
+                          className={`px-3.5 py-2 text-right font-bold ${improves
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-500'
+                            }`}
                         >
                           <span className="inline-flex items-center justify-end gap-0.5">
                             {deltaScaled >= 0 ? (
