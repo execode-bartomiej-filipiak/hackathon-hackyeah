@@ -2,6 +2,7 @@ import type {
   CommuteDestination,
   CommuteRouteResult,
   CommuteAnalysis,
+  CommuteComparisonToHome,
   TravelMode,
 } from '@/types/commute';
 
@@ -387,6 +388,33 @@ export async function fetchEnhancedCommuteAnalysis(
     weeklyCo2SavingsKg,
     treesEquivalentWeekly,
     routes: updatedRoutes,
+  };
+}
+
+/**
+ * Oblicza relacyjne porównanie KPI Miejsca odniesienia (nowego punktu)
+ * bezpośrednio względem Miejsca zamieszkania (punktu bazowego)
+ */
+export function calculateRelationalComparison(
+  targetAnalysis: CommuteAnalysis,
+  homeAnalysis: CommuteAnalysis
+): CommuteComparisonToHome {
+  const savedHoursPerWeek = Number(
+    (homeAnalysis.totalHoursPerWeek - targetAnalysis.totalHoursPerWeek).toFixed(1)
+  );
+  const savedCo2Kg = Number(
+    (homeAnalysis.totalWeeklyCo2Kg - targetAnalysis.totalWeeklyCo2Kg).toFixed(1)
+  );
+  const scoreDelta = targetAnalysis.score - homeAnalysis.score;
+
+  return {
+    homeHoursPerWeek: homeAnalysis.totalHoursPerWeek,
+    homeCo2Kg: homeAnalysis.totalWeeklyCo2Kg,
+    homeScore: homeAnalysis.score,
+    savedHoursPerWeek,
+    savedCo2Kg,
+    scoreDelta,
+    hasReference: true,
   };
 }
 

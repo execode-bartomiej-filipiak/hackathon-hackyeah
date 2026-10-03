@@ -357,7 +357,19 @@ export function CommuteHud({
                         <span className="text-[10px] text-muted-foreground font-normal">/ tydzień</span>
                       </div>
                       <div className="text-[10px] font-medium pl-5">
-                        {analysis.weeklySavingsHours >= 0 ? (
+                        {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (
+                          analysis.comparisonToHome.savedHoursPerWeek >= 0 ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                              <TrendingDownIcon className="size-3" />
+                              Oszczędzasz {analysis.comparisonToHome.savedHoursPerWeek} h/tydz. vs mieszkanie
+                            </span>
+                          ) : (
+                            <span className="text-rose-500 flex items-center gap-0.5">
+                              <TrendingUpIcon className="size-3" />
+                              +{Math.abs(analysis.comparisonToHome.savedHoursPerWeek)} h/tydz. dłużej vs mieszkanie
+                            </span>
+                          )
+                        ) : analysis.weeklySavingsHours >= 0 ? (
                           <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
                             <TrendingDownIcon className="size-3" />
                             Oszczędzasz {analysis.weeklySavingsHours} h/tydz. vs norma
@@ -378,9 +390,25 @@ export function CommuteHud({
                         <span>{analysis.totalWeeklyCo2Kg} kg CO₂</span>
                         <span className="text-[10px] text-muted-foreground font-normal">/ tydzień</span>
                       </div>
-                      <div className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 pl-5">
-                        <TrendingDownIcon className="size-3" />
-                        Oszczędzasz {analysis.weeklyCo2SavingsKg} kg vs auto
+                      <div className="text-[10px] font-medium pl-5">
+                        {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (
+                          analysis.comparisonToHome.savedCo2Kg >= 0 ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                              <TrendingDownIcon className="size-3" />
+                              Oszczędzasz {analysis.comparisonToHome.savedCo2Kg} kg CO₂/tydz. vs mieszkanie
+                            </span>
+                          ) : (
+                            <span className="text-rose-500 flex items-center gap-0.5">
+                              <TrendingUpIcon className="size-3" />
+                              +{Math.abs(analysis.comparisonToHome.savedCo2Kg)} kg CO₂/tydz. vs mieszkanie
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                            <TrendingDownIcon className="size-3" />
+                            Oszczędzasz {analysis.weeklyCo2SavingsKg} kg vs auto
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -393,7 +421,9 @@ export function CommuteHud({
                   >
                     <span className="text-xl font-black leading-none">{analysis.score}</span>
                     <span className="text-[9px] uppercase font-bold tracking-wider opacity-80 mt-0.5">
-                      Score
+                      {analysis.comparisonToHome && analysis.comparisonToHome.hasReference
+                        ? `${analysis.comparisonToHome.scoreDelta >= 0 ? '+' : ''}${analysis.comparisonToHome.scoreDelta} vs dom`
+                        : 'Score'}
                     </span>
                   </div>
                 </div>
@@ -405,7 +435,9 @@ export function CommuteHud({
                   className="w-full pt-1.5 border-t border-border/50 flex items-center justify-between text-[10px] text-muted-foreground hover:text-foreground font-medium transition-colors group cursor-pointer"
                 >
                   <span className="group-hover:text-primary transition-colors">
-                    Szczegóły analityki i ekologii
+                    {analysis.comparisonToHome && analysis.comparisonToHome.hasReference
+                      ? 'Porównanie analityki i ekologii z mieszkaniem'
+                      : 'Szczegóły analityki i ekologii'}
                   </span>
                   <ExternalLinkIcon className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
                 </button>

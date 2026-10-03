@@ -21,7 +21,11 @@ import {
   Building2Icon,
 } from 'lucide-react';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
-import { calculateCommuteAnalysis, fetchEnhancedCommuteAnalysis } from '@/lib/commute';
+import {
+  calculateCommuteAnalysis,
+  fetchEnhancedCommuteAnalysis,
+  calculateRelationalComparison,
+} from '@/lib/commute';
 import { CommuteHud } from '@/components/commute-hud';
 import { AddDestinationDialog } from '@/components/add-destination-dialog';
 import type {
@@ -831,10 +835,17 @@ export function Krakow3DMap() {
 
     if (activeOriginBuilding && currentDestinations.length > 0) {
       // 1. Natychmiastowe wstępne wyniki w panelu HUD i markery celów
-      const baseAnalysis = calculateCommuteAnalysis(
-        activeOriginBuilding.coordinates,
-        currentDestinations
-      );
+      let baseAnalysis: CommuteAnalysis;
+
+      if (referenceBuilding && homeBuilding) {
+        const homeBase = calculateCommuteAnalysis(homeBuilding.coordinates, currentDestinations);
+        const refBase = calculateCommuteAnalysis(referenceBuilding.coordinates, currentDestinations);
+        refBase.comparisonToHome = calculateRelationalComparison(refBase, homeBase);
+        baseAnalysis = refBase;
+      } else {
+        baseAnalysis = calculateCommuteAnalysis(activeOriginBuilding.coordinates, currentDestinations);
+      }
+
       setCommuteAnalysis(baseAnalysis);
       updateDestinationMarkers(map, currentDestinations, baseAnalysis.routes);
 
@@ -857,26 +868,58 @@ export function Krakow3DMap() {
       }, 6500);
 
       // 3. Asynchroniczne pobranie prawdziwych tras po ulicach Krakowa (OSRM)
-      fetchEnhancedCommuteAnalysis(
-        activeOriginBuilding.coordinates,
-        currentDestinations,
-        'transit',
-        controller.signal
-      )
-        .then((realAnalysis) => {
-          clearTimeout(fallbackTimer);
-          if (isCancelled || !mapRef.current) return;
-          setCommuteAnalysis(realAnalysis);
-          routesRef.current = realAnalysis.routes;
-          updateTrajectoriesLayer(mapRef.current, realAnalysis.routes);
-          updateDestinationMarkers(mapRef.current, currentDestinations, realAnalysis.routes);
-        })
-        .catch(() => {
-          clearTimeout(fallbackTimer);
-          if (isCancelled || !mapRef.current) return;
-          routesRef.current = baseAnalysis.routes;
-          updateTrajectoriesLayer(mapRef.current, baseAnalysis.routes);
-        });
+      if (referenceBuilding && homeBuilding) {
+        Promise.all([
+          fetchEnhancedCommuteAnalysis(
+            referenceBuilding.coordinates,
+            currentDestinations,
+            'transit',
+            controller.signal
+          ),
+          fetchEnhancedCommuteAnalysis(
+            homeBuilding.coordinates,
+            currentDestinations,
+            'transit',
+            controller.signal
+          ),
+        ])
+          .then(([refReal, homeReal]) => {
+            clearTimeout(fallbackTimer);
+            if (isCancelled || !mapRef.current) return;
+            refReal.comparisonToHome = calculateRelationalComparison(refReal, homeReal);
+            setCommuteAnalysis(refReal);
+            routesRef.current = refReal.routes;
+            updateTrajectoriesLayer(mapRef.current, refReal.routes);
+            updateDestinationMarkers(mapRef.current, currentDestinations, refReal.routes);
+          })
+          .catch(() => {
+            clearTimeout(fallbackTimer);
+            if (isCancelled || !mapRef.current) return;
+            routesRef.current = baseAnalysis.routes;
+            updateTrajectoriesLayer(mapRef.current, baseAnalysis.routes);
+          });
+      } else {
+        fetchEnhancedCommuteAnalysis(
+          activeOriginBuilding.coordinates,
+          currentDestinations,
+          'transit',
+          controller.signal
+        )
+          .then((realAnalysis) => {
+            clearTimeout(fallbackTimer);
+            if (isCancelled || !mapRef.current) return;
+            setCommuteAnalysis(realAnalysis);
+            routesRef.current = realAnalysis.routes;
+            updateTrajectoriesLayer(mapRef.current, realAnalysis.routes);
+            updateDestinationMarkers(mapRef.current, currentDestinations, realAnalysis.routes);
+          })
+          .catch(() => {
+            clearTimeout(fallbackTimer);
+            if (isCancelled || !mapRef.current) return;
+            routesRef.current = baseAnalysis.routes;
+            updateTrajectoriesLayer(mapRef.current, baseAnalysis.routes);
+          });
+      }
 
       return () => {
         isCancelled = true;
@@ -895,6 +938,8 @@ export function Krakow3DMap() {
     }
   }, [
     activeOriginBuilding,
+    homeBuilding,
+    referenceBuilding,
     activeProfile,
     mapLoaded,
     hasPresetLoaded,
@@ -1083,13 +1128,13 @@ export function Krakow3DMap() {
       isSwitchingBuildingRef.current = false;
     }
 
-    const demoHomeCoords: [number, number] = [19.9395, 50.0631];
+    const demoHomeCoords: [number, number] = [20.0380, 50.0710];
     const demoHomeBuilding: SelectedBuildingInfo = {
-      name: 'ul. Floriańska 14, Stare Miasto',
-      type: 'Kamienica mieszkalna',
-      height: 22,
-      levels: 4,
-      district: 'Stare Miasto',
+      name: 'Os. Kolorowe 12, Nowa Huta',
+      type: 'Budynek wielorodzinny',
+      height: 28,
+      levels: 8,
+      district: 'Nowa Huta',
       coordinates: demoHomeCoords,
     };
 
@@ -1107,7 +1152,7 @@ export function Krakow3DMap() {
     setReferenceBuilding(demoRefBuilding);
     homeBuildingRef.current = demoHomeBuilding;
     referenceBuildingRef.current = demoRefBuilding;
-    setSelectedBuilding(demoHomeBuilding);
+    setSelectedBuilding(demoRefBuilding);
 
     // Podświetlenie w 3D obu demonstracyjnych lokalizacji
     const source = mapRef.current.getSource('selected-building-source');

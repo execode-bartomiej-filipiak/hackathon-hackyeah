@@ -24,14 +24,25 @@ export interface CommuteRouteResult {
   co2EmissionKg?: number; // kg CO2 na 1 przejazd
 }
 
+export interface CommuteComparisonToHome {
+  homeHoursPerWeek: number;
+  homeCo2Kg: number;
+  homeScore: number;
+  savedHoursPerWeek: number; // reference vs home (dodatnie = oszczędzamy czas)
+  savedCo2Kg: number; // reference vs home (dodatnie = oszczędzamy CO2)
+  scoreDelta: number; // reference vs home (dodatnie = lepszy wynik punktowy)
+  hasReference: boolean;
+}
+
 export interface CommuteAnalysis {
   score: number; // 0 - 100
   totalHoursPerWeek: number;
-  weeklySavingsHours: number; // względem średniej krakowskiej (7.5h)
+  weeklySavingsHours: number; // względem średniej krakowskiej (7.2h) lub mieszkania
   totalWeeklyCo2Kg: number; // łączna emisja CO2 w kg / tydzień
   weeklyCo2SavingsKg: number; // oszczędność CO2 względem podróży samochodem (kg / tydzień)
   treesEquivalentWeekly: number; // ekwiwalent drzew absorbujących CO2
   routes: CommuteRouteResult[];
+  comparisonToHome?: CommuteComparisonToHome;
 }
 
 export interface CommuteProfile {

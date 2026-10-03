@@ -86,10 +86,16 @@ export function AnalyticsDetailsDialog({
 
             <div className="space-y-1 min-w-0">
               <div className="text-xs font-bold text-foreground">
-                Ocena potencjału komunikacyjnego
+                {analysis.comparisonToHome && analysis.comparisonToHome.hasReference
+                  ? `Ocena zmiany lokalizacji (${analysis.comparisonToHome.scoreDelta >= 0 ? '+' : ''}${analysis.comparisonToHome.scoreDelta} pkt vs obecne mieszkanie)`
+                  : 'Ocena potencjału komunikacyjnego'}
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                {getScoreAssessment(analysis.score)}
+                {analysis.comparisonToHome && analysis.comparisonToHome.hasReference
+                  ? analysis.comparisonToHome.scoreDelta >= 0
+                    ? `Wybór tej lokalizacji podnosi Twój CommuteScore z ${analysis.comparisonToHome.homeScore} do ${analysis.score} punktów, znacząco redukując czas spędzany w korkach.`
+                    : `Ta lokalizacja obniża Twój CommuteScore z ${analysis.comparisonToHome.homeScore} do ${analysis.score} punktów ze względu na większą odległość od Twoich stałych celów.`
+                  : getScoreAssessment(analysis.score)}
               </p>
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-0.5">
                 <CheckCircle2Icon className="size-3.5 shrink-0" />
@@ -118,24 +124,49 @@ export function AnalyticsDetailsDialog({
               </div>
 
               <div className="pt-2 border-t border-border/50 text-[11px] space-y-1 text-muted-foreground">
-                <div className="flex items-center justify-between">
-                  <span>Średnia w Krakowie:</span>
-                  <span className="font-semibold text-foreground">7.2 h / tydz.</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Bilans dojazdów:</span>
-                  {analysis.weeklySavingsHours >= 0 ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
-                      <TrendingDownIcon className="size-3" />
-                      -{analysis.weeklySavingsHours} h (oszczędność)
-                    </span>
-                  ) : (
-                    <span className="text-rose-500 font-bold flex items-center gap-0.5">
-                      <TrendingUpIcon className="size-3" />
-                      +{Math.abs(analysis.weeklySavingsHours)} h ponad normę
-                    </span>
-                  )}
-                </div>
+                {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span>Obecne mieszkanie:</span>
+                      <span className="font-semibold text-foreground">{analysis.comparisonToHome.homeHoursPerWeek} h / tydz.</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Różnica czasu:</span>
+                      {analysis.comparisonToHome.savedHoursPerWeek >= 0 ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
+                          <TrendingDownIcon className="size-3" />
+                          -{analysis.comparisonToHome.savedHoursPerWeek} h (oszczędność)
+                        </span>
+                      ) : (
+                        <span className="text-rose-500 font-bold flex items-center gap-0.5">
+                          <TrendingUpIcon className="size-3" />
+                          +{Math.abs(analysis.comparisonToHome.savedHoursPerWeek)} h dłużej
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span>Średnia w Krakowie:</span>
+                      <span className="font-semibold text-foreground">7.2 h / tydz.</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Bilans dojazdów:</span>
+                      {analysis.weeklySavingsHours >= 0 ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
+                          <TrendingDownIcon className="size-3" />
+                          -{analysis.weeklySavingsHours} h (oszczędność)
+                        </span>
+                      ) : (
+                        <span className="text-rose-500 font-bold flex items-center gap-0.5">
+                          <TrendingUpIcon className="size-3" />
+                          +{Math.abs(analysis.weeklySavingsHours)} h ponad normę
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -157,17 +188,42 @@ export function AnalyticsDetailsDialog({
               </div>
 
               <div className="pt-2 border-t border-emerald-500/20 text-[11px] space-y-1 text-emerald-800 dark:text-emerald-300">
-                <div className="flex items-center justify-between">
-                  <span>Oszczędność vs auto:</span>
-                  <span className="font-bold flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300">
-                    <TrendingDownIcon className="size-3" />
-                    -{analysis.weeklyCo2SavingsKg} kg CO₂/tydz.
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Kompensacja w drzewach:</span>
-                  <span className="font-semibold">🌲 ≈ {analysis.treesEquivalentWeekly} drzew/rok</span>
-                </div>
+                {analysis.comparisonToHome && analysis.comparisonToHome.hasReference ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span>Obecne mieszkanie:</span>
+                      <span className="font-semibold">{analysis.comparisonToHome.homeCo2Kg} kg CO₂/tydz.</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Różnica emisji:</span>
+                      {analysis.comparisonToHome.savedCo2Kg >= 0 ? (
+                        <span className="font-bold flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300">
+                          <TrendingDownIcon className="size-3" />
+                          -{analysis.comparisonToHome.savedCo2Kg} kg CO₂/tydz.
+                        </span>
+                      ) : (
+                        <span className="font-bold flex items-center gap-0.5 text-rose-500">
+                          <TrendingUpIcon className="size-3" />
+                          +{Math.abs(analysis.comparisonToHome.savedCo2Kg)} kg CO₂/tydz.
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span>Oszczędność vs auto:</span>
+                      <span className="font-bold flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300">
+                        <TrendingDownIcon className="size-3" />
+                        -{analysis.weeklyCo2SavingsKg} kg CO₂/tydz.
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Kompensacja w drzewach:</span>
+                      <span className="font-semibold">🌲 ≈ {analysis.treesEquivalentWeekly} drzew/rok</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
