@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type {
   Map,
@@ -23,6 +23,16 @@ import {
   XIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { COMMUTE_PROFILES } from '@/mock/commute-presets';
+import { calculateCommuteAnalysis } from '@/lib/commute';
+import { CommuteHud } from '@/components/commute-hud';
+import type {
+  CommuteProfile,
+  TravelMode,
+  CommuteAnalysis,
+  CommuteRouteResult,
+  CommuteDestination,
+} from '@/types/commute';
 
 interface SelectedBuildingInfo {
   name: string;
@@ -32,8 +42,6 @@ interface SelectedBuildingInfo {
   district: string;
   coordinates: [number, number];
 }
-
-
 
 function getDistrict(lng: number, lat: number): string {
   const distRynek = Math.hypot(lng - 19.9373, lat - 50.0617);
@@ -55,24 +63,92 @@ export function Krakow3DMap() {
   const mapRef = useRef<Map | null>(null);
   const popupRef = useRef<Popup | null>(null);
   const isRotatingRef = useRef(false);
+  const destinationMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuildingInfo | null>(null);
   const [pitch, setPitch] = useState(62);
   const [bearing, setBearing] = useState(-20);
   const [isRotating, setIsRotating] = useState(false);
-  const [tokenInput, setTokenInput] = useState('');
 
-  const [engineType, setEngineType] = useState<'openfreemap' | 'mapbox'>('openfreemap');
+  // Stan profilu dojazdów i transportu
+  const [activeProfile, setActiveProfile] = useState<CommuteProfile>(COMMUTE_PROFILES[0]);
+  const [travelMode, setTravelMode] = useState<TravelMode>('transit');
+  const [commuteAnalysis, setCommuteAnalysis] = useState<CommuteAnalysis | null>(null);
 
-  // Sprawdzamy zapisany token Mapbox
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const savedToken =
-      localStorage.getItem('krakow_mapbox_token') || process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-    if (savedToken) {
-      setTokenInput(savedToken);
-      setEngineType('mapbox');
+  // Aktualizacja markerów celów na mapie 3D
+  const updateDestinationMarkers = useCallback(
+    (map: Map, destinations: CommuteDestination[], routes: CommuteRouteResult[]) => {
+      // Usuwamy poprzednie markery
+      destinationMarkersRef.current.forEach((m) => m.remove());
+      destinationMarkersRef.current = [];
+
+      destinations.forEach((dest) => {
+        const route = routes.find((r) => r.destinationId === dest.id);
+        const el = document.createElement('div');
+        el.className = 'commute-destination-marker cursor-pointer select-none group';
+
+        const statusBg =
+          route?.status === 'optimal'
+            ? 'bg-emerald-600 text-white'
+            : route?.status === 'moderate'
+            ? 'bg-amber-600 text-white'
+            : route?.status === 'heavy'
+            ? 'bg-rose-600 text-white'
+            : 'bg-primary text-primary-foreground';
+
+        el.innerHTML = `
+          <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-xl border border-white/40 backdrop-blur-md ${statusBg} text-xs font-semibold transition-transform group-hover:scale-105">
+            <span class="text-sm">${dest.icon}</span>
+            <span class="truncate max-w-[110px] hidden sm:inline">${dest.name.split(' ')[0]}</span>
+            ${
+              route
+                ? `<span class="bg-black/35 px-1.5 py-0.5 rounded-full text-[10px] font-bold tracking-tight">${route.durationMinutes}m</span>`
+                : ''
+            }
+          </div>
+        `;
+
+        el.onclick = (event) => {
+          event.stopPropagation();
+          map.flyTo({
+            center: dest.coordinates,
+            zoom: 16.5,
+            pitch: 62,
+            duration: 1600,
+            essential: true,
+          });
+        };
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat(dest.coordinates)
+          .addTo(map);
+
+        destinationMarkersRef.current.push(marker);
+      });
+    },
+    []
+  );
+
+  // Aktualizacja trajektorii GeoJSON na mapie
+  const updateTrajectoriesLayer = useCallback((map: Map, routes: CommuteRouteResult[]) => {
+    const source = map.getSource('commute-trajectories-source');
+    if (source && source.type === 'geojson') {
+      const geoSource = source as GeoJSONSource;
+      geoSource.setData({
+        type: 'FeatureCollection',
+        features: routes.map((route) => ({
+          type: 'Feature',
+          properties: {
+            status: route.status,
+            duration: route.durationMinutes,
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: route.trajectoryCoordinates,
+          },
+        })),
+      });
     }
   }, []);
 
@@ -88,10 +164,7 @@ export function Krakow3DMap() {
     setMapLoaded(false);
 
     maplibregl.setWorkerUrl('/maplibre-gl-worker.mjs');
-    const styleUrl =
-      engineType === 'mapbox' && tokenInput
-        ? `https://api.mapbox.com/styles/v1/mapbox/dark-v11?access_token=${tokenInput}`
-        : 'https://tiles.openfreemap.org/styles/liberty';
+    const styleUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
     const mapInstance = new maplibregl.Map({
       container: mapContainerRef.current,
@@ -104,9 +177,9 @@ export function Krakow3DMap() {
       attributionControl: false,
     });
 
-    mapInstance.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    mapInstance.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left');
     mapInstance.addControl(
-      new maplibregl.AttributionControl({ compact: true, customAttribution: '3D Kraków PoC' }),
+      new maplibregl.AttributionControl({ compact: true, customAttribution: '3D Kraków CommuteScore PoC' }),
       'bottom-right'
     );
 
@@ -136,39 +209,72 @@ export function Krakow3DMap() {
         });
       }
 
-      // Dodanie warstwy 3D dla stylu Mapbox jeśli brak natywnego fill-extrusion
-      const layers: LayerSpecification[] = mapInstance.getStyle().layers || [];
-      const has3D = layers.some(
-        (l: LayerSpecification) => l.type === 'fill-extrusion' && l.id !== 'selected-building-highlight'
-      );
-
-      if (!has3D && mapInstance.getSource('composite')) {
-        const labelLayer = layers.find((l: LayerSpecification) => l.type === 'symbol');
-        mapInstance.addLayer(
-          {
-            id: '3d-buildings-extrusion',
-            source: 'composite',
-            'source-layer': 'building',
-            filter: ['==', 'extrude', 'true'],
-            type: 'fill-extrusion',
-            minzoom: 14,
-            paint: {
-              'fill-extrusion-color': '#cbd5e1',
-              'fill-extrusion-height': ['get', 'height'],
-              'fill-extrusion-base': ['get', 'min_height'],
-              'fill-extrusion-opacity': 0.8,
-            },
+      // Źródło i warstwy trajektorii dojazdów (Commute Lines)
+      if (!mapInstance.getSource('commute-trajectories-source')) {
+        mapInstance.addSource('commute-trajectories-source', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: [],
           },
-          labelLayer?.id
-        );
+        });
+
+        // Efekt poświaty linii
+        mapInstance.addLayer({
+          id: 'commute-trajectories-glow',
+          type: 'line',
+          source: 'commute-trajectories-source',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-width': 8,
+            'line-opacity': 0.4,
+            'line-color': [
+              'match',
+              ['get', 'status'],
+              'optimal',
+              '#10b981',
+              'moderate',
+              '#f59e0b',
+              'heavy',
+              '#ef4444',
+              '#6366f1',
+            ],
+            'line-blur': 3,
+          },
+        });
+
+        // Główna linia trajektorii
+        mapInstance.addLayer({
+          id: 'commute-trajectories-line',
+          type: 'line',
+          source: 'commute-trajectories-source',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-width': 4,
+            'line-opacity': 0.95,
+            'line-color': [
+              'match',
+              ['get', 'status'],
+              'optimal',
+              '#10b981',
+              'moderate',
+              '#f59e0b',
+              'heavy',
+              '#ef4444',
+              '#6366f1',
+            ],
+          },
+        });
       }
 
       // Kursor pointer nad budynkami 3D
-      const buildingLayerIds = [
-        'building-3d',
-        '3d-buildings-extrusion',
-        'building',
-      ].filter((id) => mapInstance.getLayer(id));
+      const buildingLayerIds = ['building-3d', 'building'].filter((id) => mapInstance.getLayer(id));
 
       mapInstance.on('mousemove', (e: MapLayerMouseEvent) => {
         const features = mapInstance.queryRenderedFeatures(e.point, {
@@ -195,6 +301,7 @@ export function Krakow3DMap() {
             f.sourceLayer === 'building' ||
             f.layer.id.includes('building')
         );
+
         if (buildingFeature) {
           const props = buildingFeature.properties || {};
           const height =
@@ -210,7 +317,10 @@ export function Krakow3DMap() {
             (props['name:pl'] as string | undefined) ||
             (props['name:en'] as string | undefined) ||
             `Budynek 3D #${String(buildingFeature.id || Math.floor(Math.random() * 9000 + 1000))}`;
-          const type = (props.building as string | undefined) || (props.type as string | undefined) || 'Zabudowa miejska';
+          const type =
+            (props.building as string | undefined) ||
+            (props.type as string | undefined) ||
+            'Zabudowa miejska';
           const district = getDistrict(e.lngLat.lng, e.lngLat.lat);
 
           const buildingInfo: SelectedBuildingInfo = {
@@ -224,7 +334,7 @@ export function Krakow3DMap() {
 
           setSelectedBuilding(buildingInfo);
 
-          // Bezpieczna aktualizacja podświetlenia
+          // Podświetlenie geometrii budynku
           const source = mapInstance.getSource('selected-building-source');
           if (source && source.type === 'geojson') {
             const geoSource = source as GeoJSONSource;
@@ -277,7 +387,7 @@ export function Krakow3DMap() {
             .addTo(mapInstance);
 
           toast.info(`Zaznaczono obiekt: ${name}`, {
-            description: `Wysokość: ${Math.round(height)}m, Dzielnica: ${district}`,
+            description: `Wyliczono czasy dojazdów dla: ${activeProfile.name}`,
           });
         }
       });
@@ -294,7 +404,35 @@ export function Krakow3DMap() {
         mapRef.current = null;
       }
     };
-  }, [engineType, tokenInput]);
+  }, []);
+
+  // Przeliczanie analizy dojazdów i aktualizacja warstw na mapie
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    if (selectedBuilding) {
+      const analysis = calculateCommuteAnalysis(
+        selectedBuilding.coordinates,
+        activeProfile.destinations,
+        travelMode
+      );
+      setCommuteAnalysis(analysis);
+      updateTrajectoriesLayer(map, analysis.routes);
+      updateDestinationMarkers(map, activeProfile.destinations, analysis.routes);
+    } else {
+      setCommuteAnalysis(null);
+      updateTrajectoriesLayer(map, []);
+      updateDestinationMarkers(map, activeProfile.destinations, []);
+    }
+  }, [
+    selectedBuilding,
+    activeProfile,
+    travelMode,
+    mapLoaded,
+    updateTrajectoriesLayer,
+    updateDestinationMarkers,
+  ]);
 
   // Rotacja animowana 360°
   useEffect(() => {
@@ -317,8 +455,6 @@ export function Krakow3DMap() {
     };
   }, [isRotating]);
 
-
-
   // Reset zaznaczenia
   const handleClearSelection = () => {
     setSelectedBuilding(null);
@@ -338,7 +474,76 @@ export function Krakow3DMap() {
     }
   };
 
+  // Fokus na trasie do wybranego celu z panelu HUD
+  const handleFocusDestination = (route: CommuteRouteResult) => {
+    if (!mapRef.current || !selectedBuilding) return;
 
+    // Wyznaczamy środek trasy do płynnego objęcia wzrokiem
+    const midLng = (selectedBuilding.coordinates[0] + route.coordinates[0]) / 2;
+    const midLat = (selectedBuilding.coordinates[1] + route.coordinates[1]) / 2;
+
+    mapRef.current.flyTo({
+      center: [midLng, midLat],
+      zoom: 15.2,
+      pitch: 58,
+      duration: 1600,
+      essential: true,
+    });
+
+    toast.info(`Trasa do: ${route.destinationName}`, {
+      description: `Czas: ${route.durationMinutes} min (${route.distanceKm} km)`,
+    });
+  };
+
+  // Prezentacyjny przycisk wyboru budynku na scenie
+  const handleSelectDemoOrigin = () => {
+    if (!mapRef.current) return;
+
+    const demoCoords: [number, number] = [19.9373, 50.0617];
+    const demoBuilding: SelectedBuildingInfo = {
+      name: 'Sukiennice & Rynek Główny',
+      type: 'Zabytkowa / Handlowa',
+      height: 24,
+      levels: 3,
+      district: 'Stare Miasto',
+      coordinates: demoCoords,
+    };
+
+    setSelectedBuilding(demoBuilding);
+
+    // Podświetlenie w 3D
+    const source = mapRef.current.getSource('selected-building-source');
+    if (source && source.type === 'geojson') {
+      const geoSource = source as GeoJSONSource;
+      geoSource.setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {
+              render_height: 25,
+              render_min_height: 0,
+            },
+            geometry: {
+              type: 'Point',
+              coordinates: demoCoords,
+            },
+          },
+        ],
+      });
+    }
+
+    mapRef.current.flyTo({
+      center: [19.9450, 50.0550], // perspektywa obejmująca Kazimierz i Zabłocie
+      zoom: 15.2,
+      pitch: 60,
+      bearing: -15,
+      essential: true,
+      duration: 1800,
+    });
+
+    toast.success('Wybrano lokalizację demonstracyjną: Rynek Główny');
+  };
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
@@ -360,16 +565,16 @@ export function Krakow3DMap() {
         </div>
       )}
 
-      {/* PŁYWAJĄCY PASEK KONTROLI KAMERY 3D */}
-      <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-2 bg-background/90 backdrop-blur-md p-2 rounded-lg border border-border shadow-md">
+      {/* PŁYWAJĄCY PASEK KONTROLI KAMERY 3D (LEWY GÓRNY RÓG) */}
+      <div className="absolute top-4 left-14 z-20 flex flex-wrap items-center gap-2 bg-background/90 backdrop-blur-md p-2 rounded-xl border border-border/80 shadow-lg">
         <Button
           variant={isRotating ? 'default' : 'outline'}
           size="sm"
           onClick={() => setIsRotating(!isRotating)}
-          className="text-xs h-7 px-2 gap-1.5"
+          className="text-xs h-7 px-2.5 gap-1.5 font-medium"
         >
           <RotateCwIcon className={`size-3.5 ${isRotating ? 'animate-spin' : ''}`} />
-          {isRotating ? 'Zatrzymaj obrót' : 'Obrót 360°'}
+          {isRotating ? 'Zatrzymaj' : 'Obrót 360°'}
         </Button>
 
         <div className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono text-muted-foreground border-l border-border">
@@ -389,22 +594,35 @@ export function Krakow3DMap() {
               mapRef.current.easeTo({ pitch: 62, bearing: -20 });
             }
           }}
-          className="text-xs h-7 px-2"
+          className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
         >
           Reset
         </Button>
       </div>
 
-      {/* PŁYWAJĄCA KARTA WYBRANEGO BUDYNKU 3D */}
+      {/* PŁYWAJĄCY PANEL COMMUTE HUD (PRAWY GÓRNY RÓG) */}
+      <CommuteHud
+        profiles={COMMUTE_PROFILES}
+        activeProfile={activeProfile}
+        onSelectProfile={(p) => setActiveProfile(p)}
+        travelMode={travelMode}
+        onSelectTravelMode={(m) => setTravelMode(m)}
+        analysis={commuteAnalysis}
+        selectedBuildingName={selectedBuilding?.name}
+        onFocusDestination={handleFocusDestination}
+        onSelectDemoOrigin={handleSelectDemoOrigin}
+      />
+
+      {/* PŁYWAJĄCA KARTA WYBRANEGO BUDYNKU 3D (LEWY DOLNY RÓG) */}
       {selectedBuilding && (
-        <div className="absolute bottom-4 left-4 z-20 max-w-sm w-full bg-background/95 backdrop-blur-md p-4 rounded-xl border border-primary/40 shadow-xl space-y-3 animate-in fade-in slide-in-from-bottom-2">
+        <div className="absolute bottom-4 left-4 z-20 max-w-sm w-full bg-background/95 backdrop-blur-md p-4 rounded-2xl border border-primary/40 shadow-2xl space-y-3 animate-in fade-in slide-in-from-bottom-2">
           <div className="flex items-start justify-between gap-2">
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 min-w-0">
               <div className="flex items-center gap-1.5 text-xs text-primary font-semibold">
                 <Building2Icon className="size-3.5" />
-                <span>Zaznaczony Budynek 3D</span>
+                <span>Wybrany Budynek</span>
               </div>
-              <h4 className="font-bold text-sm text-foreground line-clamp-1">
+              <h4 className="font-bold text-sm text-foreground truncate">
                 {selectedBuilding.name}
               </h4>
             </div>
@@ -412,16 +630,16 @@ export function Krakow3DMap() {
               variant="ghost"
               size="sm"
               onClick={handleClearSelection}
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
             >
               <XIcon className="size-4" />
             </Button>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <RulerIcon className="size-3" /> Wysokość bryły
+            <div className="rounded-xl border border-border bg-muted/30 p-2.5 space-y-0.5">
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
+                <RulerIcon className="size-3" /> Wysokość
               </span>
               <div className="font-bold text-sm text-foreground">
                 {selectedBuilding.height} m
@@ -431,14 +649,14 @@ export function Krakow3DMap() {
               </span>
             </div>
 
-            <div className="rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <div className="rounded-xl border border-border bg-muted/30 p-2.5 space-y-0.5">
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
                 <MapPinIcon className="size-3" /> Dzielnica
               </span>
-              <div className="font-bold text-xs text-foreground">
+              <div className="font-bold text-xs text-foreground truncate">
                 {selectedBuilding.district}
               </div>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[10px] text-muted-foreground truncate block">
                 {selectedBuilding.type}
               </span>
             </div>
@@ -462,19 +680,19 @@ export function Krakow3DMap() {
                   });
                 }
               }}
-              className="text-xs h-7 gap-1"
+              className="text-xs h-7 gap-1 font-medium"
             >
               <Maximize2Icon className="size-3" />
-              Przybliż
+              Skup kamerę
             </Button>
           </div>
         </div>
       )}
 
       {/* INSTRUKCJA DLA UŻYTKOWNIKA */}
-      <div className="absolute bottom-3 right-3 z-10 pointer-events-none hidden sm:flex items-center gap-1.5 bg-background/85 backdrop-blur-xs px-2.5 py-1 rounded-md border border-border text-[11px] text-muted-foreground shadow-sm">
+      <div className="absolute bottom-3 right-3 z-10 pointer-events-none hidden sm:flex items-center gap-1.5 bg-background/85 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-border text-[11px] text-muted-foreground shadow-sm">
         <InfoIcon className="size-3.5 text-primary" />
-        <span>Kliknij dowolny budynek w 3D, aby go zaznaczyć i wyświetlić parametry.</span>
+        <span>Kliknij dowolny budynek w 3D, aby wyliczyć czas dojazdów do punktów życia.</span>
       </div>
     </div>
   );
