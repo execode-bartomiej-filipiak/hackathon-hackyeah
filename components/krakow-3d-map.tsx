@@ -251,6 +251,7 @@ export function Krakow3DMap() {
 
 
   const [pendingDestination, setPendingDestination] = useState<PendingNewDestination | null>(null);
+  const [editingDestination, setEditingDestination] = useState<CommuteDestination | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [commuteAnalysis, setCommuteAnalysis] = useState<CommuteAnalysis | null>(null);
   // Aktualizacja markerów celów na mapie 3D
@@ -986,8 +987,15 @@ export function Krakow3DMap() {
     );
   };
 
-  // Zatwierdzenie nowego celu z modala
+  // Otwarcie edycji celu
+  const handleOpenEditDestination = (dest: CommuteDestination) => {
+    setEditingDestination(dest);
+    setIsAddDialogOpen(true);
+  };
+
+  // Zatwierdzenie nowego lub edytowanego celu z modala
   const handleConfirmAddDestination = (data: {
+    id?: string;
     name: string;
     category: CommuteDestination['category'];
     icon: string;
@@ -995,26 +1003,53 @@ export function Krakow3DMap() {
     travelMode: TravelMode;
     coordinates: [number, number];
   }) => {
-    const newDest: CommuteDestination = {
-      id: 'dest_custom_' + Date.now(),
-      name: data.name,
-      category: data.category,
-      icon: data.icon,
-      coordinates: data.coordinates,
-      frequencyPerWeek: data.frequencyPerWeek,
-      travelMode: data.travelMode,
-    };
+    if (data.id) {
+      // Aktualizacja istniejącego celu
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.id === activeProfile.id
+            ? {
+                ...p,
+                destinations: p.destinations.map((d) =>
+                  d.id === data.id
+                    ? {
+                        ...d,
+                        name: data.name,
+                        category: data.category,
+                        icon: data.icon,
+                        frequencyPerWeek: data.frequencyPerWeek,
+                        travelMode: data.travelMode,
+                      }
+                    : d
+                ),
+              }
+            : p
+        )
+      );
+    } else {
+      // Dodanie nowego celu
+      const newDest: CommuteDestination = {
+        id: 'dest_custom_' + Date.now(),
+        name: data.name,
+        category: data.category,
+        icon: data.icon,
+        coordinates: data.coordinates,
+        frequencyPerWeek: data.frequencyPerWeek,
+        travelMode: data.travelMode,
+      };
 
-    setProfiles((prev) =>
-      prev.map((p) =>
-        p.id === activeProfile.id
-          ? { ...p, destinations: [...p.destinations, newDest] }
-          : p
-      )
-    );
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.id === activeProfile.id
+            ? { ...p, destinations: [...p.destinations, newDest] }
+            : p
+        )
+      );
+    }
 
     setIsAddDialogOpen(false);
     setPendingDestination(null);
+    setEditingDestination(null);
   };
 
 
@@ -1102,6 +1137,7 @@ export function Krakow3DMap() {
         onToggleAddTarget={() => setIsAddingTarget(!isAddingTarget)}
         onRemoveDestination={handleRemoveDestination}
         onUpdateDestinationMode={handleUpdateDestinationMode}
+        onEditDestination={handleOpenEditDestination}
       />
 
 
@@ -1111,17 +1147,33 @@ export function Krakow3DMap() {
         <span>Kliknij dowolny budynek w 3D, aby wyliczyć czas dojazdów do punktów życia.</span>
       </div>
 
-      {/* MODAL DEFINIOWANIA NOWEGO CELU */}
-      {pendingDestination && (
+      {/* MODAL DEFINIOWANIA LUB EDYCJI CELU */}
+      {(pendingDestination || editingDestination) && (
         <AddDestinationDialog
           open={isAddDialogOpen}
           onOpenChange={(open) => {
             setIsAddDialogOpen(open);
-            if (!open) setPendingDestination(null);
+            if (!open) {
+              setPendingDestination(null);
+              setEditingDestination(null);
+            }
           }}
-          coordinates={pendingDestination.coordinates}
-          initialAddress={pendingDestination.initialAddress}
-          district={pendingDestination.district}
+          coordinates={
+            editingDestination
+              ? editingDestination.coordinates
+              : (pendingDestination?.coordinates || null)
+          }
+          initialAddress={
+            editingDestination
+              ? editingDestination.name
+              : (pendingDestination?.initialAddress || '')
+          }
+          district={
+            editingDestination
+              ? getDistrict(editingDestination.coordinates[0], editingDestination.coordinates[1])
+              : (pendingDestination?.district || '')
+          }
+          initialDestination={editingDestination}
           onConfirm={handleConfirmAddDestination}
         />
       )}

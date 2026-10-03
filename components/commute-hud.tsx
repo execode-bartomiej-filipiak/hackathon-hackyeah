@@ -5,6 +5,7 @@ import type {
   TravelMode,
   CommuteAnalysis,
   CommuteRouteResult,
+  CommuteDestination,
 } from '@/types/commute';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ import {
   MapPinIcon,
   Building2Icon,
   CrosshairIcon,
+  PencilIcon,
   XIcon,
 } from 'lucide-react';
 
@@ -60,6 +62,7 @@ interface CommuteHudProps {
   onToggleAddTarget?: () => void;
   onRemoveDestination?: (destinationId: string) => void;
   onUpdateDestinationMode?: (destinationId: string, mode: TravelMode) => void;
+  onEditDestination?: (destination: CommuteDestination) => void;
 }
 
 export function CommuteHud({
@@ -72,6 +75,7 @@ export function CommuteHud({
   onToggleAddTarget,
   onRemoveDestination,
   onUpdateDestinationMode,
+  onEditDestination,
 }: CommuteHudProps) {
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
@@ -135,40 +139,49 @@ export function CommuteHud({
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-2">
                         <span className="text-sm shrink-0">{dest.icon}</span>
-                        <div className="min-w-0 space-y-0.5">
+                        <div className="min-w-0 space-y-1">
                           <div className="text-xs font-medium text-foreground truncate">
                             {dest.name}
                           </div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            <MapPinIcon className="size-2.5" />
-                            <span>{dest.frequencyPerWeek}x w tygodniu</span>
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <span>{dest.frequencyPerWeek}x w tyg.</span>
+                            <span>•</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const modes: TravelMode[] = ['transit', 'driving', 'bicycling', 'walking'];
+                                const nextMode = modes[(modes.indexOf(dest.travelMode) + 1) % modes.length];
+                                onUpdateDestinationMode?.(dest.id, nextMode);
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted/80 hover:bg-muted text-foreground border border-border/50 text-[10px] transition-colors"
+                              title={`Środek transportu: ${getTransportLabel(dest.travelMode)} (kliknij, aby zmienić)`}
+                            >
+                              {getTransportIcon(dest.travelMode)}
+                              <span className="font-mono text-[9px] uppercase text-muted-foreground">
+                                {getTransportLabel(dest.travelMode)}
+                              </span>
+                            </button>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {/* PRZEŁĄCZNIK ŚRODKA TRANSPORTU DLA CELU */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const modes: TravelMode[] = ['transit', 'driving', 'bicycling', 'walking'];
-                            const nextMode = modes[(modes.indexOf(dest.travelMode) + 1) % modes.length];
-                            onUpdateDestinationMode?.(dest.id, nextMode);
-                          }}
-                          className="flex items-center gap-1 py-1 px-1.5 rounded-lg bg-muted/60 hover:bg-muted text-foreground border border-border/40 text-[11px] transition-colors"
-                          title={`Środek transportu: ${getTransportLabel(dest.travelMode)} (kliknij, aby zmienić)`}
-                        >
-                          {getTransportIcon(dest.travelMode)}
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {getTransportLabel(dest.travelMode)}
-                          </span>
-                        </button>
+                        {onEditDestination && (
+                          <button
+                            type="button"
+                            onClick={() => onEditDestination(dest)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-primary transition-opacity"
+                            title="Edytuj cel"
+                          >
+                            <PencilIcon className="size-3" />
+                          </button>
+                        )}
 
                         {onRemoveDestination && activeProfile.destinations.length > 1 && (
                           <button
                             type="button"
                             onClick={() => onRemoveDestination(dest.id)}
-                            className="opacity-60 hover:opacity-100 p-1 hover:text-rose-500 transition-colors"
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 transition-opacity"
                             title="Usuń cel"
                           >
                             <XIcon className="size-3.5" />
@@ -273,46 +286,49 @@ export function CommuteHud({
                       >
                         <div className="flex items-center gap-2 min-w-0 pr-1.5">
                           <span className="text-sm shrink-0">{route.destinationIcon}</span>
-                          <div className="min-w-0 space-y-0.5">
+                          <div className="min-w-0 space-y-1">
                             <div className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors">
                               {route.destinationName}
                             </div>
-                            <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                               <span>{route.distanceKm} km</span>
                               <span>•</span>
-                              <span className="flex items-center gap-0.5">
-                                <MapPinIcon className="size-2.5" />
-                                {dest?.frequencyPerWeek || 3}x/tydz.
-                              </span>
+                              <span>{dest?.frequencyPerWeek || 3}x/tydz.</span>
+                              <span>•</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const modes: TravelMode[] = ['transit', 'driving', 'bicycling', 'walking'];
+                                  const nextMode = modes[(modes.indexOf(currentMode) + 1) % modes.length];
+                                  onUpdateDestinationMode?.(route.destinationId, nextMode);
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted/80 hover:bg-muted text-foreground border border-border/50 text-[10px] transition-colors"
+                                title={`Środek transportu: ${getTransportLabel(currentMode)} (kliknij, aby zmienić)`}
+                              >
+                                {getTransportIcon(currentMode)}
+                                <span className="font-mono text-[9px] uppercase text-muted-foreground">
+                                  {getTransportLabel(currentMode)}
+                                </span>
+                              </button>
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          {/* PRZEŁĄCZNIK TRANSPORTU DLA TEGO CELU */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const modes: TravelMode[] = ['transit', 'driving', 'bicycling', 'walking'];
-                              const nextMode = modes[(modes.indexOf(currentMode) + 1) % modes.length];
-                              onUpdateDestinationMode?.(route.destinationId, nextMode);
-                            }}
-                            className="flex items-center gap-1 py-1 px-1.5 rounded-lg bg-muted/60 hover:bg-muted text-foreground border border-border/40 text-[11px] transition-colors"
-                            title={`Środek transportu: ${getTransportLabel(currentMode)} (kliknij, aby zmienić)`}
-                          >
-                            {getTransportIcon(currentMode)}
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              {getTransportLabel(currentMode)}
-                            </span>
-                          </button>
-
-                          {/* CZAS BEZ BADGE'A <15m */}
-                          <div className="text-right min-w-[44px]">
-                            <div className="text-xs font-bold text-foreground">
-                              {route.durationMinutes} min
-                            </div>
-                          </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {onEditDestination && dest && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditDestination(dest);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:text-primary transition-opacity"
+                              title="Edytuj cel"
+                            >
+                              <PencilIcon className="size-3" />
+                            </button>
+                          )}
 
                           {onRemoveDestination && activeProfile.destinations.length > 1 && (
                             <button
@@ -327,6 +343,12 @@ export function CommuteHud({
                               <XIcon className="size-3.5" />
                             </button>
                           )}
+
+                          <div className="text-right min-w-[42px]">
+                            <div className="text-xs font-bold text-foreground">
+                              {route.durationMinutes} min
+                            </div>
+                          </div>
 
                           <ChevronRightIcon className="size-3.5 text-muted-foreground group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
                         </div>
