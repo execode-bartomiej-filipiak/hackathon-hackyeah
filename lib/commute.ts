@@ -112,6 +112,25 @@ export function getRouteStatus(durationMinutes: number): 'optimal' | 'moderate' 
 }
 
 /**
+ * Emisja CO2 w kg na 1 km w zależności od środka transportu
+ * - Samochód: 0.145 kg CO2/km (średnia flota miejska benzyna/diesel)
+ * - MPK Kraków (tramwaje z OZE / autobusy niskoemisyjne): 0.035 kg CO2/pkm
+ * - Rower: 0 kg CO2/km
+ * - Pieszo: 0 kg CO2/km
+ */
+export function getCo2FactorKgPerKm(mode: TravelMode): number {
+  switch (mode) {
+    case 'driving':
+      return 0.145;
+    case 'transit':
+      return 0.035;
+    case 'bicycling':
+    case 'walking':
+      return 0;
+  }
+}
+
+/**
  * Główna funkcja analityczna obliczająca CommuteScore oraz trasy
  */
 export function calculateCommuteAnalysis(
@@ -120,6 +139,8 @@ export function calculateCommuteAnalysis(
   fallbackMode: TravelMode = 'transit'
 ): CommuteAnalysis {
   let totalWeeklyMinutes = 0;
+  let totalWeeklyCo2KgRaw = 0;
+  let totalCarBaselineCo2KgRaw = 0;
 
   const routes: CommuteRouteResult[] = destinations.map((dest) => {
     const rawDistance = calculateHaversineKm(origin, dest.coordinates);
@@ -128,10 +149,13 @@ export function calculateCommuteAnalysis(
     const durationMinutes = Math.max(3, estimateTravelTimeMinutes(rawDistance, effectiveMode));
     const status = getRouteStatus(durationMinutes);
     const trajectoryCoordinates = generateTrajectoryCoordinates(origin, dest.coordinates);
+    const co2EmissionKg = Number((roadDistanceKm * getCo2FactorKgPerKm(effectiveMode)).toFixed(2));
 
     // Podróż w obie strony pomnożona przez częstotliwość w tygodniu
-    const roundTripMinutes = durationMinutes * 2;
-    totalWeeklyMinutes += roundTripMinutes * dest.frequencyPerWeek;
+    const roundTripsPerWeek = dest.frequencyPerWeek * 2;
+    totalWeeklyMinutes += durationMinutes * roundTripsPerWeek;
+    totalWeeklyCo2KgRaw += co2EmissionKg * roundTripsPerWeek;
+    totalCarBaselineCo2KgRaw += (roadDistanceKm * getCo2FactorKgPerKm('driving')) * roundTripsPerWeek;
 
     return {
       destinationId: dest.id,
@@ -143,6 +167,7 @@ export function calculateCommuteAnalysis(
       travelMode: effectiveMode,
       status,
       trajectoryCoordinates,
+      co2EmissionKg,
     };
   });
 
@@ -151,6 +176,14 @@ export function calculateCommuteAnalysis(
   // Benchmark: przeciętny mieszkaniec Krakowa spędza w podróżach miejskich ok. 7.2h tygodniowo
   const KRAKOW_BENCHMARK_HOURS = 7.2;
   const weeklySavingsHours = Number((KRAKOW_BENCHMARK_HOURS - totalHoursPerWeek).toFixed(1));
+
+  // Ekologia: bilans CO2 tygodniowo
+  const totalWeeklyCo2Kg = Number(totalWeeklyCo2KgRaw.toFixed(1));
+  const weeklyCo2SavingsKg = Number(
+    Math.max(0, totalCarBaselineCo2KgRaw - totalWeeklyCo2KgRaw).toFixed(1)
+  );
+  // Jedno dojrzałe drzewo pochłania ok. 0.42 kg CO2 tygodniowo (~22 kg rocznie)
+  const treesEquivalentWeekly = Math.max(1, Math.round(weeklyCo2SavingsKg / 0.42));
 
   // Algorytm CommuteScore (0 - 100):
   // 1-3h tygodniowo -> 90-98 pkt
@@ -164,6 +197,9 @@ export function calculateCommuteAnalysis(
     score,
     totalHoursPerWeek,
     weeklySavingsHours,
+    totalWeeklyCo2Kg,
+    weeklyCo2SavingsKg,
+    treesEquivalentWeekly,
     routes,
   };
 }
@@ -296,6 +332,9 @@ export async function fetchEnhancedCommuteAnalysis(
     const realRoute = await fetchOsmStreetRoute(origin, dest.coordinates, effectiveMode, signal);
 
     if (realRoute && realRoute.coordinates.length >= 2) {
+      const co2EmissionKg = Number(
+        (realRoute.distanceKm * getCo2FactorKgPerKm(effectiveMode)).toFixed(2)
+      );
       return {
         ...baseRoute,
         distanceKm: realRoute.distanceKm,
@@ -303,6 +342,7 @@ export async function fetchEnhancedCommuteAnalysis(
         status: getRouteStatus(realRoute.durationMinutes),
         trajectoryCoordinates: realRoute.coordinates,
         isRealRoute: true,
+        co2EmissionKg,
       };
     }
 
@@ -311,17 +351,30 @@ export async function fetchEnhancedCommuteAnalysis(
 
   const updatedRoutes = await Promise.all(routePromises);
 
-  // Przeliczenie bilansu tygodniowego na bazie realnych czasów
+  // Przeliczenie bilansu tygodniowego na bazie realnych czasów i dystansów
   let totalWeeklyMinutes = 0;
+  let totalWeeklyCo2KgRaw = 0;
+  let totalCarBaselineCo2KgRaw = 0;
+
   updatedRoutes.forEach((route) => {
     const dest = destinations.find((d) => d.id === route.destinationId);
     const freq = dest ? dest.frequencyPerWeek : 2;
-    totalWeeklyMinutes += route.durationMinutes * 2 * freq;
+    const roundTrips = freq * 2;
+    totalWeeklyMinutes += route.durationMinutes * roundTrips;
+    const co2Trip = route.co2EmissionKg ?? (route.distanceKm * getCo2FactorKgPerKm(route.travelMode));
+    totalWeeklyCo2KgRaw += co2Trip * roundTrips;
+    totalCarBaselineCo2KgRaw += (route.distanceKm * getCo2FactorKgPerKm('driving')) * roundTrips;
   });
 
   const totalHoursPerWeek = Number((totalWeeklyMinutes / 60).toFixed(1));
   const KRAKOW_BENCHMARK_HOURS = 7.2;
   const weeklySavingsHours = Number((KRAKOW_BENCHMARK_HOURS - totalHoursPerWeek).toFixed(1));
+
+  const totalWeeklyCo2Kg = Number(totalWeeklyCo2KgRaw.toFixed(1));
+  const weeklyCo2SavingsKg = Number(
+    Math.max(0, totalCarBaselineCo2KgRaw - totalWeeklyCo2KgRaw).toFixed(1)
+  );
+  const treesEquivalentWeekly = Math.max(1, Math.round(weeklyCo2SavingsKg / 0.42));
 
   const rawScore = 100 - (totalHoursPerWeek / 12) * 60;
   const score = Math.max(12, Math.min(98, Math.round(rawScore)));
@@ -330,6 +383,9 @@ export async function fetchEnhancedCommuteAnalysis(
     score,
     totalHoursPerWeek,
     weeklySavingsHours,
+    totalWeeklyCo2Kg,
+    weeklyCo2SavingsKg,
+    treesEquivalentWeekly,
     routes: updatedRoutes,
   };
 }

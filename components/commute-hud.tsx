@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type {
   CommuteProfile,
   TravelMode,
@@ -25,7 +26,10 @@ import {
   PencilIcon,
   XIcon,
   HomeIcon,
+  LeafIcon,
+  ExternalLinkIcon,
 } from 'lucide-react';
+import { AnalyticsDetailsDialog } from '@/components/analytics-details-dialog';
 
 function getTransportIcon(mode: TravelMode) {
   switch (mode) {
@@ -103,6 +107,8 @@ export function CommuteHud({
     if (score >= 60) return 'text-amber-500 border-amber-500/30 bg-amber-500/10';
     return 'text-rose-500 border-rose-500/30 bg-rose-500/10';
   };
+
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
 
   const effectiveHomeName = homeBuildingName || (!referenceBuildingName ? selectedBuildingName : undefined);
   const effectiveRefName = referenceBuildingName;
@@ -320,7 +326,7 @@ export function CommuteHud({
                 )}
               </div>
 
-              {/* 3. DÓŁ: PRZYCISK TESTUJ PRZYKŁADOWE DANE */}
+              {/* 4. DÓŁ: PRZYCISK TESTUJ PRZYKŁADOWE DANE */}
               {onSelectDemoOrigin && (
                 <div className="pt-1 border-t border-border/40">
                   <Button
@@ -338,9 +344,76 @@ export function CommuteHud({
           ) : (
             /* WYNIKI ANALIZY COMMUTE SCORE */
             <div className="space-y-3 animate-in fade-in">
-              {/* MIEJSCE ZAMIESZKANIA I ODNIESIENIA W TRYBIE ANALIZY */}
+              {/* 1. SCALONA, KOMPAKTOWA SEKCJA KPI NA SAMEJ GÓRZE */}
+              <div className="p-3 rounded-xl border border-border bg-card shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  {/* LEWA STRONA: ZWIĘZŁE WIERSZE Z KOLEJNYMI KPI */}
+                  <div className="min-w-0 flex-1 space-y-2">
+                    {/* WIERSZ 1: CZAS W DRODZE */}
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <ClockIcon className="size-3.5 text-primary shrink-0" />
+                        <span>{analysis.totalHoursPerWeek} h</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">/ tydzień</span>
+                      </div>
+                      <div className="text-[10px] font-medium pl-5">
+                        {analysis.weeklySavingsHours >= 0 ? (
+                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                            <TrendingDownIcon className="size-3" />
+                            Oszczędzasz {analysis.weeklySavingsHours} h/tydz. vs norma
+                          </span>
+                        ) : (
+                          <span className="text-rose-500 flex items-center gap-0.5">
+                            <TrendingUpIcon className="size-3" />
+                            +{Math.abs(analysis.weeklySavingsHours)} h ponad normę
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* WIERSZ 2: ZANIECZYSZCZENIE ŚRODOWISKA (CO2) */}
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <LeafIcon className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>{analysis.totalWeeklyCo2Kg} kg CO₂</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">/ tydzień</span>
+                      </div>
+                      <div className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 pl-5">
+                        <TrendingDownIcon className="size-3" />
+                        Oszczędzasz {analysis.weeklyCo2SavingsKg} kg vs auto
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PRAWA STRONA: STAŁY, NIENARUSZONY PIERŚCIEŃ PUNKTOWY SCORE */}
+                  <div
+                    className={`flex flex-col items-center justify-center size-16 rounded-2xl border-2 ${getScoreColor(
+                      analysis.score
+                    )} shadow-sm shrink-0`}
+                  >
+                    <span className="text-xl font-black leading-none">{analysis.score}</span>
+                    <span className="text-[9px] uppercase font-bold tracking-wider opacity-80 mt-0.5">
+                      Score
+                    </span>
+                  </div>
+                </div>
+
+                {/* PRZYCISK OTWARCIA MODALU ZE SZCZEGÓŁAMI */}
+                <button
+                  type="button"
+                  onClick={() => setIsAnalyticsModalOpen(true)}
+                  className="w-full pt-1.5 border-t border-border/50 flex items-center justify-between text-[10px] text-muted-foreground hover:text-foreground font-medium transition-colors group cursor-pointer"
+                >
+                  <span className="group-hover:text-primary transition-colors">
+                    Szczegóły analityki i ekologii
+                  </span>
+                  <ExternalLinkIcon className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                </button>
+              </div>
+
+              {/* 2. MIEJSCE ZAMIESZKANIA I ODNIESIENIA W TRYBIE ANALIZY */}
               {(effectiveHomeName || effectiveRefName) && (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 pt-1 border-t border-border/40">
                   {effectiveHomeName && (
                     <div className="flex items-center justify-between p-2 rounded-xl border border-primary/30 bg-primary/5">
                       <div className="flex items-center gap-2 min-w-0 pr-1.5">
@@ -395,57 +468,10 @@ export function CommuteHud({
                 </div>
               )}
 
-              {/* KAFELEK KPI */}
-              <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card">
-                <div className="space-y-1">
-                  <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                    <ClockIcon className="size-3 text-primary" />
-                    Tygodniowo w drodze
-                  </span>
-                  <div className="text-xl font-bold tracking-tight text-foreground">
-                    {analysis.totalHoursPerWeek} h
-                    <span className="text-xs font-normal text-muted-foreground ml-1">/ tydzień</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[11px]">
-                    {analysis.weeklySavingsHours >= 0 ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
-                        <TrendingDownIcon className="size-3" />
-                        Oszczędzasz {analysis.weeklySavingsHours} h/tydz.
-                      </span>
-                    ) : (
-                      <span className="text-rose-500 font-semibold flex items-center gap-0.5">
-                        <TrendingUpIcon className="size-3" />
-                        +{Math.abs(analysis.weeklySavingsHours)} h ponad normę
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* DUŻY PIERŚCIEŃ PUNKTOWY */}
-                <div
-                  className={`flex flex-col items-center justify-center size-16 rounded-2xl border-2 ${getScoreColor(
-                    analysis.score
-                  )} shadow-sm`}
-                >
-                  <span className="text-xl font-black leading-none">{analysis.score}</span>
-                  <span className="text-[9px] uppercase font-bold tracking-wider opacity-80 mt-0.5">
-                    Score
-                  </span>
-                </div>
-              </div>
-
               {/* LISTA PUNKTÓW DOCELOWYCH */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <span>Cele ({analysis.routes.length}):</span>
-                    {analysis.routes.some((r) => r.isRealRoute) && (
-                      <span className="text-[9px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Trasy uliczne OSM
-                      </span>
-                    )}
-                  </div>
+                  <span>Cele ({analysis.routes.length}):</span>
                   {selectedBuildingName && (
                     <span className="font-normal truncate max-w-[130px] text-foreground">
                       Z: {selectedBuildingName}
@@ -560,6 +586,17 @@ export function CommuteHud({
           )}
         </CardContent>
       </Card>
+
+      {/* MODAL ZE SZCZEGÓŁAMI ANALITYKI I EKOLOGII */}
+      {analysis && (
+        <AnalyticsDetailsDialog
+          open={isAnalyticsModalOpen}
+          onOpenChange={setIsAnalyticsModalOpen}
+          analysis={analysis}
+          homeBuildingName={effectiveHomeName}
+          referenceBuildingName={effectiveRefName}
+        />
+      )}
     </div>
   );
 }

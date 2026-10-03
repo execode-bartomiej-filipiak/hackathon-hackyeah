@@ -21,12 +21,16 @@ export interface CommuteRouteResult {
   status: 'optimal' | 'moderate' | 'heavy'; // <15m optymalny, 15-30m umiarkowany, >30m uciążliwy
   trajectoryCoordinates: Array<[number, number]>;
   isRealRoute?: boolean;
+  co2EmissionKg?: number; // kg CO2 na 1 przejazd
 }
 
 export interface CommuteAnalysis {
   score: number; // 0 - 100
   totalHoursPerWeek: number;
   weeklySavingsHours: number; // względem średniej krakowskiej (7.5h)
+  totalWeeklyCo2Kg: number; // łączna emisja CO2 w kg / tydzień
+  weeklyCo2SavingsKg: number; // oszczędność CO2 względem podróży samochodem (kg / tydzień)
+  treesEquivalentWeekly: number; // ekwiwalent drzew absorbujących CO2
   routes: CommuteRouteResult[];
 }
 

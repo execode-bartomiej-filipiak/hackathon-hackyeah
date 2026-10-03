@@ -1083,20 +1083,33 @@ export function Krakow3DMap() {
       isSwitchingBuildingRef.current = false;
     }
 
-    const demoCoords: [number, number] = [19.9373, 50.0617];
-    const demoBuilding: SelectedBuildingInfo = {
+    const demoHomeCoords: [number, number] = [19.9395, 50.0631];
+    const demoHomeBuilding: SelectedBuildingInfo = {
+      name: 'ul. Floriańska 14, Stare Miasto',
+      type: 'Kamienica mieszkalna',
+      height: 22,
+      levels: 4,
+      district: 'Stare Miasto',
+      coordinates: demoHomeCoords,
+    };
+
+    const demoRefCoords: [number, number] = [19.9373, 50.0617];
+    const demoRefBuilding: SelectedBuildingInfo = {
       name: 'Sukiennice & Rynek Główny',
       type: 'Zabytkowa / Handlowa',
       height: 24,
       levels: 3,
       district: 'Stare Miasto',
-      coordinates: demoCoords,
+      coordinates: demoRefCoords,
     };
 
-    setHomeBuilding(demoBuilding);
-    setSelectedBuilding(demoBuilding);
+    setHomeBuilding(demoHomeBuilding);
+    setReferenceBuilding(demoRefBuilding);
+    homeBuildingRef.current = demoHomeBuilding;
+    referenceBuildingRef.current = demoRefBuilding;
+    setSelectedBuilding(demoHomeBuilding);
 
-    // Podświetlenie w 3D
+    // Podświetlenie w 3D obu demonstracyjnych lokalizacji
     const source = mapRef.current.getSource('selected-building-source');
     if (source && source.type === 'geojson') {
       const geoSource = source as GeoJSONSource;
@@ -1106,12 +1119,23 @@ export function Krakow3DMap() {
           {
             type: 'Feature',
             properties: {
+              render_height: 22,
+              render_min_height: 0,
+            },
+            geometry: {
+              type: 'Point',
+              coordinates: demoHomeCoords,
+            },
+          },
+          {
+            type: 'Feature',
+            properties: {
               render_height: 25,
               render_min_height: 0,
             },
             geometry: {
               type: 'Point',
-              coordinates: demoCoords,
+              coordinates: demoRefCoords,
             },
           },
         ],
@@ -1119,8 +1143,8 @@ export function Krakow3DMap() {
     }
 
     mapRef.current.flyTo({
-      center: [19.9450, 50.0550], // perspektywa obejmująca Kazimierz i Zabłocie
-      zoom: 15.2,
+      center: [19.9410, 50.0600], // perspektywa obejmująca oba punkty i dojazdy
+      zoom: 15.4,
       pitch: 60,
       bearing: -15,
       essential: true,
