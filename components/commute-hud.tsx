@@ -8,7 +8,6 @@ import type {
 } from '@/types/commute';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   SparklesIcon,
   TrainIcon,
@@ -26,9 +25,9 @@ import {
 } from 'lucide-react';
 
 interface CommuteHudProps {
-  profiles: CommuteProfile[];
+  profiles?: CommuteProfile[];
   activeProfile: CommuteProfile;
-  onSelectProfile: (profile: CommuteProfile) => void;
+  onSelectProfile?: (profile: CommuteProfile) => void;
   travelMode: TravelMode;
   onSelectTravelMode: (mode: TravelMode) => void;
   analysis: CommuteAnalysis | null;
@@ -88,40 +87,12 @@ export function CommuteHud({
       {/* KARTA GŁÓWNA COMMUTE SCORE */}
       <Card className="border border-border/80 bg-background/90 backdrop-blur-md shadow-2xl rounded-2xl overflow-hidden p-0">
         <CardContent className="p-4 space-y-3.5">
-          {/* NAGŁÓWEK I WYBÓR PROFILU */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="flex size-2 rounded-full bg-primary animate-pulse" />
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Analiza Dojazdów 3D
-                </span>
-              </div>
-              <Badge variant="outline" className="text-[10px] font-mono py-0 px-1.5">
-                Kraków Model
-              </Badge>
-            </div>
-
-            {/* PRZYCISKI PROFILI UŻYTKOWNIKA */}
-            <div className="grid grid-cols-3 gap-1 p-1 bg-muted/50 rounded-xl border border-border/60">
-              {profiles.map((p) => {
-                const isActive = p.id === activeProfile.id;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => onSelectProfile(p)}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
-                      isActive
-                        ? 'bg-background text-foreground shadow-xs font-semibold'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <span>{p.icon}</span>
-                    <span className="truncate">{p.name.split(' ')[0]}</span>
-                  </button>
-                );
-              })}
-            </div>
+          {/* NAGŁÓWEK */}
+          <div className="flex items-center gap-2">
+            <span className="flex size-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Analiza Dojazdów 3D
+            </span>
           </div>
 
           {/* PRZEŁĄCZNIK ŚRODKA TRANSPORTU */}
@@ -187,7 +158,7 @@ export function CommuteHud({
                     Wybierz lokalizację na mapie
                   </h4>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Kliknij dowolny budynek 3D w Krakowie, aby wyliczyć czas dojazdów dla profilu: <strong>{activeProfile.name}</strong>.
+                    Kliknij dowolny budynek 3D w Krakowie, aby wyliczyć czas dojazdów do zdefiniowanych celów.
                   </p>
                 </div>
 
