@@ -30,7 +30,9 @@ import {
   LeafIcon,
   ExternalLinkIcon,
   RotateCcwIcon,
+  WalletIcon,
 } from 'lucide-react';
+import { formatPln } from '@/lib/utils';
 import { AnalyticsDetailsDialog } from '@/components/analytics-details-dialog';
 
 function getTransportIcon(mode: TravelMode) {
@@ -133,6 +135,7 @@ export function CommuteHud({
     : analysis?.weeklySavingsHours ?? 0;
   const timeSaved = savedHours >= 0;
   const timeScope = hasReference ? 'vs mieszkanie' : 'vs norma krakowska';
+
 
   return (
     <div className="absolute top-4 right-4 z-20 w-80 sm:w-96 max-h-[calc(100vh-2rem)] flex flex-col gap-1.5 overflow-y-auto pointer-events-auto select-none font-sans scrollbar-none">
@@ -464,6 +467,14 @@ export function CommuteHud({
                     </span>
                     CO₂
                   </span>
+                  <span className="text-border">•</span>
+                  <span className="flex items-center gap-1">
+                    <WalletIcon className="size-3 shrink-0" />
+                    <span className="font-semibold text-foreground/80 tabular-nums">
+                      {formatPln(analysis.totalWeeklyCostPln, 0)} zł
+                    </span>
+                    / tydz.
+                  </span>
                   <ExternalLinkIcon className="size-3 ml-auto shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity" />
                 </div>
               </button>
@@ -566,10 +577,7 @@ export function CommuteHud({
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
                   <span className="flex items-center gap-1.5">
                     <span>Cele ({analysis.routes.length}):</span>
-                    <span
-                      className="text-[9px] font-medium text-muted-foreground/80 border border-border/70 rounded-full px-1.5 py-0.5 leading-none"
-                      title="Podany czas dotyczy jednego przejazdu. Bilans tygodniowy liczy dojazd i powrót (×2) dla każdej wizyty."
-                    >
+                    <span className="text-[9px] font-medium text-muted-foreground/80 border border-border/70 rounded-full px-1.5 py-0.5 leading-none">
                       ×2 tam i z powrotem
                     </span>
                   </span>
@@ -618,6 +626,9 @@ export function CommuteHud({
                                 {getTransportIcon(currentMode)}
                                 <span className="font-mono text-[9px] uppercase text-muted-foreground">
                                   {getTransportLabel(currentMode)}
+                                </span>
+                                <span className="text-[9px] font-bold text-foreground/80 tabular-nums">
+                                  {formatPln(route.costPlnPerTrip, Number.isInteger(route.costPlnPerTrip) ? 0 : 2)} zł
                                 </span>
                               </button>
                             </div>

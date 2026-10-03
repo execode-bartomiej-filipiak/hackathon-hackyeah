@@ -22,6 +22,8 @@ export interface CommuteRouteResult {
   trajectoryCoordinates: Array<[number, number]>;
   isRealRoute?: boolean;
   co2EmissionKg?: number; // kg CO2 na 1 przejazd
+  costPlnPerTrip: number; // koszt jednego przejazdu (w jedną stronę) w zł
+  ticketType?: string; // np. "Bilet 15-minutowy" lub "Paliwo 0,68 zł/km (8,5 l/100 km × 8,00 zł/l)"
 }
 
 export interface CommuteComparisonToHome {
@@ -32,6 +34,8 @@ export interface CommuteComparisonToHome {
   savedCo2Kg: number; // reference vs home (dodatnie = oszczędzamy CO2)
   scoreDelta: number; // reference vs home (dodatnie = lepszy wynik punktowy)
   hasReference: boolean;
+  homeWeeklyCostPln: number; // tygodniowy koszt dojazdów z obecnego mieszkania
+  savedCostWeeklyPln: number; // reference vs home (dodatnie = taniej)
 }
 
 export interface CommuteAnalysis {
@@ -41,6 +45,8 @@ export interface CommuteAnalysis {
   totalWeeklyCo2Kg: number; // łączna emisja CO2 w kg / tydzień
   weeklyCo2SavingsKg: number; // oszczędność CO2 względem podróży samochodem (kg / tydzień)
   treesEquivalentWeekly: number; // ekwiwalent drzew absorbujących CO2
+  totalWeeklyCostPln: number; // łączny koszt dojazdów w zł / tydzień (w obie strony)
+  weeklyCostSavingsVsCarPln: number; // oszczędność budżetu względem wariantu czysto samochodowego
   routes: CommuteRouteResult[];
   comparisonToHome?: CommuteComparisonToHome;
 }

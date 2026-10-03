@@ -55,6 +55,86 @@ export function generateTrajectoryCoordinates(
 }
 
 /**
+ * Założenia kosztu paliwa w mieście: 8,00 zł/l przy średnim spalaniu 8,5 l/100 km
+ */
+export const FUEL_PRICE_PLN_PER_LITER = 8;
+export const CAR_FUEL_CONSUMPTION_L_PER_100KM = 8.5;
+
+/**
+ * Składowe algorytmu CommuteScore (0-100).
+ * Wzór: score = clamp(100 − (godziny w drodze / 12) × 60, 12, 98)
+ */
+export const COMMUTE_SCORE_FULL_HOURS = 12; // liczba godzin, przy której wynik spada o pełne 60 pkt
+export const COMMUTE_SCORE_FALL_PER_HOUR = 60;
+export const COMMUTE_SCORE_BASE = 100;
+export const COMMUTE_SCORE_MIN = 12;
+export const COMMUTE_SCORE_MAX = 98;
+
+/**
+ * Benchmark: przeciętny mieszkaniec Krakowa spędza w podróżach miejskich ok. 7,2 h tygodniowo
+ */
+export const KRAKOW_BENCHMARK_HOURS = 7.2;
+
+/**
+ * Wyznacza CommuteScore (0-100) na podstawie tygodniowego czasu w drodze
+ */
+export function getCommuteScore(totalHoursPerWeek: number): number {
+  const raw =
+    COMMUTE_SCORE_BASE -
+    (totalHoursPerWeek / COMMUTE_SCORE_FULL_HOURS) * COMMUTE_SCORE_FALL_PER_HOUR;
+  return Math.max(COMMUTE_SCORE_MIN, Math.min(COMMUTE_SCORE_MAX, Math.round(raw)));
+}
+
+/**
+ * Koszt paliwa na kilometr: 8,5 l/100 km × 8,00 zł/l = 0,68 zł/km
+ */
+export const CAR_COST_PER_KM_PLN = Number(
+  ((CAR_FUEL_CONSUMPTION_L_PER_100KM / 100) * FUEL_PRICE_PLN_PER_LITER).toFixed(2)
+);
+
+/**
+ * Taryfa biletów czasowych MPK Kraków (Strefa I+II+III, normalne)
+ */
+export const MPK_TICKETS = [
+  { maxMinutes: 15, pricePln: 4, label: 'Bilet 15-minutowy' },
+  { maxMinutes: 30, pricePln: 6, label: 'Bilet 30-minutowy' },
+  { maxMinutes: 60, pricePln: 8, label: 'Bilet 60-minutowy' },
+  { maxMinutes: Infinity, pricePln: 9, label: 'Bilet 90-minutowy' },
+] as const;
+
+/**
+ * Dobiera bilet czasowy MPK do czasu jednego przejazdu
+ */
+export function getTransitTicket(durationMinutes: number): { pricePln: number; label: string } {
+  const ticket = MPK_TICKETS.find((t) => durationMinutes <= t.maxMinutes) ?? MPK_TICKETS[MPK_TICKETS.length - 1];
+  return { pricePln: ticket.pricePln, label: ticket.label };
+}
+
+/**
+ * Koszt jednego przejazdu (w jedną stronę) w zł dla wybranego środka transportu
+ */
+export function getTripCostPln(
+  distanceKm: number,
+  durationMinutes: number,
+  mode: TravelMode
+): { costPlnPerTrip: number; ticketType?: string } {
+  switch (mode) {
+    case 'transit': {
+      const ticket = getTransitTicket(durationMinutes);
+      return { costPlnPerTrip: ticket.pricePln, ticketType: ticket.label };
+    }
+    case 'driving':
+      return {
+        costPlnPerTrip: Number((distanceKm * CAR_COST_PER_KM_PLN).toFixed(2)),
+        ticketType: `Paliwo ${CAR_COST_PER_KM_PLN.toFixed(2).replace('.', ',')} zł/km (${CAR_FUEL_CONSUMPTION_L_PER_100KM.toFixed(1).replace('.', ',')} l/100 km × ${FUEL_PRICE_PLN_PER_LITER.toFixed(2).replace('.', ',')} zł/l)`,
+      };
+    case 'bicycling':
+    case 'walking':
+      return { costPlnPerTrip: 0, ticketType: 'Transport zeroemisyjny' };
+  }
+}
+
+/**
  * Szacuje czas dojazdu w krakowskich warunkach szczytowych
  */
 export function estimateTravelTimeMinutes(
@@ -128,6 +208,8 @@ export function calculateCommuteAnalysis(
   fallbackMode: TravelMode = 'transit'
 ): CommuteAnalysis {
   let totalWeeklyMinutes = 0;
+  let totalWeeklyCostPlnRaw = 0;
+  let totalCarBaselineCostPlnRaw = 0;
   let totalWeeklyCo2KgRaw = 0;
   let totalCarBaselineCo2KgRaw = 0;
 
@@ -139,12 +221,15 @@ export function calculateCommuteAnalysis(
     const status = getRouteStatus(durationMinutes);
     const trajectoryCoordinates = generateTrajectoryCoordinates(origin, dest.coordinates, 48);
     const co2EmissionKg = Number((roadDistanceKm * getCo2FactorKgPerKm(effectiveMode)).toFixed(2));
+    const { costPlnPerTrip, ticketType } = getTripCostPln(roadDistanceKm, durationMinutes, effectiveMode);
 
     // Podróż w obie strony pomnożona przez częstotliwość w tygodniu
     const roundTripsPerWeek = dest.frequencyPerWeek * 2;
     totalWeeklyMinutes += durationMinutes * roundTripsPerWeek;
     totalWeeklyCo2KgRaw += co2EmissionKg * roundTripsPerWeek;
     totalCarBaselineCo2KgRaw += (roadDistanceKm * getCo2FactorKgPerKm('driving')) * roundTripsPerWeek;
+    totalWeeklyCostPlnRaw += costPlnPerTrip * roundTripsPerWeek;
+    totalCarBaselineCostPlnRaw += roadDistanceKm * CAR_COST_PER_KM_PLN * roundTripsPerWeek;
 
     return {
       destinationId: dest.id,
@@ -157,13 +242,14 @@ export function calculateCommuteAnalysis(
       status,
       trajectoryCoordinates,
       co2EmissionKg,
+      costPlnPerTrip,
+      ticketType,
     };
   });
 
   const totalHoursPerWeek = Number((totalWeeklyMinutes / 60).toFixed(1));
 
-  // Benchmark: przeciętny mieszkaniec Krakowa spędza w podróżach miejskich ok. 7.2h tygodniowo
-  const KRAKOW_BENCHMARK_HOURS = 7.2;
+  // Benchmark: przeciętny mieszkaniec Krakowa spędza w podróżach miejskich ok. 7,2 h tygodniowo
   const weeklySavingsHours = Number((KRAKOW_BENCHMARK_HOURS - totalHoursPerWeek).toFixed(1));
 
   // Ekologia: bilans CO2 tygodniowo
@@ -174,13 +260,18 @@ export function calculateCommuteAnalysis(
   // Jedno dojrzałe drzewo pochłania ok. 0.42 kg CO2 tygodniowo (~22 kg rocznie)
   const treesEquivalentWeekly = Math.max(1, Math.round(weeklyCo2SavingsKg / 0.42));
 
+  // Budżet: koszt tygodniowy dojazdów oraz oszczędność względem wariantu czysto samochodowego
+  const totalWeeklyCostPln = Number(totalWeeklyCostPlnRaw.toFixed(2));
+  const weeklyCostSavingsVsCarPln = Number(
+    Math.max(0, totalCarBaselineCostPlnRaw - totalWeeklyCostPlnRaw).toFixed(2)
+  );
+
   // Algorytm CommuteScore (0 - 100):
   // 1-3h tygodniowo -> 90-98 pkt
   // 4-6h tygodniowo -> 75-88 pkt
   // 7-10h tygodniowo -> 50-70 pkt
   // >12h tygodniowo -> <40 pkt
-  const rawScore = 100 - (totalHoursPerWeek / 12) * 60;
-  const score = Math.max(12, Math.min(98, Math.round(rawScore)));
+  const score = getCommuteScore(totalHoursPerWeek);
 
   return {
     score,
@@ -189,6 +280,8 @@ export function calculateCommuteAnalysis(
     totalWeeklyCo2Kg,
     weeklyCo2SavingsKg,
     treesEquivalentWeekly,
+    totalWeeklyCostPln,
+    weeklyCostSavingsVsCarPln,
     routes,
   };
 }
@@ -327,6 +420,9 @@ export function calculateRelationalComparison(
     (homeAnalysis.totalWeeklyCo2Kg - targetAnalysis.totalWeeklyCo2Kg).toFixed(1)
   );
   const scoreDelta = targetAnalysis.score - homeAnalysis.score;
+  const savedCostWeeklyPln = Number(
+    (homeAnalysis.totalWeeklyCostPln - targetAnalysis.totalWeeklyCostPln).toFixed(2)
+  );
 
   return {
     homeHoursPerWeek: homeAnalysis.totalHoursPerWeek,
@@ -336,6 +432,8 @@ export function calculateRelationalComparison(
     savedCo2Kg,
     scoreDelta,
     hasReference: true,
+    homeWeeklyCostPln: homeAnalysis.totalWeeklyCostPln,
+    savedCostWeeklyPln,
   };
 }
 
