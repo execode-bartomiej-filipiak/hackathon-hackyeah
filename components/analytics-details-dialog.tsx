@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { CommuteAnalysis } from '@/types/commute';
 import {
   Dialog,
@@ -29,12 +30,22 @@ import {
   COMMUTE_SCORE_MAX,
   COMMUTE_SCORE_MIN,
   FUEL_PRICE_PLN_PER_LITER,
+  KRAKOW_BENCHMARK_HOURS,
   MPK_TICKETS,
   getCo2FactorKgPerKm,
   getCommuteScore,
 } from '@/lib/commute';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatPln } from '@/lib/utils';
+
+// Horyzonty oszczędności: tydzień → miesiąc (52 tyg. / 12 mies.) → rok (52 tyg.)
+const HORIZONS = [
+  { id: 'week', label: 'Tydzień', factor: 1, suffix: '/ tydz.' },
+  { id: 'month', label: 'Miesiąc', factor: 52 / 12, suffix: '/ mies.' },
+  { id: 'year', label: 'Rok', factor: 52, suffix: '/ rok' },
+] as const;
+
+type HorizonId = (typeof HORIZONS)[number]['id'];
 
 // Dyskretna etykieta „Metodologia obliczeń” — szczegóły w tooltipie po najechaniu
 function MethodologyHint({ tooltip }: { tooltip: string }) {
@@ -72,15 +83,26 @@ export function AnalyticsDetailsDialog({
   homeBuildingName,
   referenceBuildingName,
 }: AnalyticsDetailsDialogProps) {
+  const [horizonId, setHorizonId] = useState<HorizonId>('week');
+  const horizon = HORIZONS.find((item) => item.id === horizonId) ?? HORIZONS[0];
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
     if (score >= 60) return 'text-amber-500 border-amber-500/30 bg-amber-500/10';
     return 'text-rose-500 border-rose-500/30 bg-rose-500/10';
   };
 
-  const comparison = analysis.comparisonToHome;
+  const getScoreAssessment = (score: number) => {
+    if (score >= 85) return 'Wybitna lokalizacja (idealny standard 15-minutowego miasta)';
+    if (score >= 70) return 'Bardzo dobra dostępność komunikacyjna i niska uciążliwość dojazdów';
+    if (score >= 50) return 'Przeciętna dostępność, zbalansowany czas podróży w skali tygodnia';
+    return 'Podwyższona uciążliwość dojazdów względem standardów miejskich';
+  };
 
-  // Skrót taryf MPK do opisów metodologii
+  const comparison = analysis.comparisonToHome;
+  const hasReference = Boolean(comparison?.hasReference);
+
+  // Skrót taryf MPK do opisu metodologii
   const mpkTicketSummary = MPK_TICKETS.map(
     (ticket) =>
       `${ticket.maxMinutes === Infinity ? 'powyżej 60' : ticket.maxMinutes} min — ${formatPln(ticket.pricePln, 2)} zł`
@@ -118,16 +140,123 @@ export function AnalyticsDetailsDialog({
     'Odległość drogowa = dystans w linii prostej × 1,28 (krętość siatki ulic Krakowa).',
   ].join('\n');
 
-  const getScoreAssessment = (score: number) => {
-    if (score >= 85) return 'Wybitna lokalizacja (idealny standard 15-minutowego miasta)';
-    if (score >= 70) return 'Bardzo dobra dostępność komunikacyjna i niska uciążliwość dojazdów';
-    if (score >= 50) return 'Przeciętna dostępność, zbalansowany czas podróży w skali tygodnia';
-    return 'Podwyższona uciążliwość dojazdów względem standardów miejskich';
-  };
+  // Najistotniejsze dane: oszczędności tygodniowe oraz wartości obu lokalizacji
+  const tiles = [
+    {
+      id: 'cost',
+      label: 'Koszt dojazdów',
+      icon: WalletIcon,
+      unit: 'zł',
+      decimals: 0,
+      tooltip: costTooltip,
+      savedWeekly: hasReference
+        ? comparison?.savedCostWeeklyPln ?? 0
+        : analysis.weeklyCostSavingsVsCarPln,
+      currentWeekly: comparison?.homeWeeklyCostPln ?? 0,
+      nextWeekly: analysis.totalWeeklyCostPln,
+    },
+    {
+      id: 'time',
+      label: 'Czas w drodze',
+      icon: ClockIcon,
+      unit: 'h',
+      decimals: 1,
+      tooltip: timeTooltip,
+      savedWeekly: hasReference
+        ? comparison?.savedHoursPerWeek ?? 0
+        : analysis.weeklySavingsHours,
+      currentWeekly: comparison?.homeHoursPerWeek ?? 0,
+      nextWeekly: analysis.totalHoursPerWeek,
+    },
+    {
+      id: 'co2',
+      label: 'Emisja CO₂',
+      icon: LeafIcon,
+      unit: 'kg CO₂',
+      decimals: 1,
+      tooltip: co2Tooltip,
+      savedWeekly: hasReference ? comparison?.savedCo2Kg ?? 0 : analysis.weeklyCo2SavingsKg,
+      currentWeekly: comparison?.homeCo2Kg ?? 0,
+      nextWeekly: analysis.totalWeeklyCo2Kg,
+    },
+  ];
+
+  const formatValue = (value: number, decimals: number) =>
+    decimals === 0 ? formatPln(value, 0) : value.toFixed(decimals);
+
+  // Rozbudowane podsumowanie: rozkład dojazdów, skrajne cele i kontekst krakowski
+  const routes = analysis.routes;
+  const optimalCount = routes.filter((route) => route.status === 'optimal').length;
+  const moderateCount = routes.filter((route) => route.status === 'moderate').length;
+  const heavyCount = routes.filter((route) => route.status === 'heavy').length;
+  const avgMinutes = routes.length
+    ? Math.round(routes.reduce((sum, route) => sum + route.durationMinutes, 0) / routes.length)
+    : 0;
+  const worstRoute = routes.length
+    ? routes.reduce((a, b) => (b.durationMinutes > a.durationMinutes ? b : a))
+    : null;
+  const bestRoute = routes.length
+    ? routes.reduce((a, b) => (b.durationMinutes < a.durationMinutes ? b : a))
+    : null;
+  const benchmarkDeltaHours = Math.abs(
+    Number((KRAKOW_BENCHMARK_HOURS - analysis.totalHoursPerWeek).toFixed(1))
+  );
+  const belowBenchmark = analysis.totalHoursPerWeek <= KRAKOW_BENCHMARK_HOURS;
+  const yearlyCarSavingPln = Math.round(analysis.weeklyCostSavingsVsCarPln * 52);
+  const yearlyCo2SavingKg = Math.round(analysis.weeklyCo2SavingsKg * 52);
+
+  // Zestawienie decyzyjne: obecne vs nowe miejsce zamieszkania (w wybranym horyzoncie)
+  const homeHours = comparison?.homeHoursPerWeek ?? 0;
+  const homeCost = comparison?.homeWeeklyCostPln ?? 0;
+  const homeCo2 = comparison?.homeCo2Kg ?? 0;
+  const homeScore = comparison?.homeScore ?? 0;
+
+  const comparisonRows = [
+    {
+      id: 'score',
+      label: 'CommuteScore',
+      unit: 'pkt',
+      decimals: 0,
+      scalesWithHorizon: false,
+      lowerIsBetter: false,
+      current: homeScore,
+      next: analysis.score,
+    },
+    {
+      id: 'hours',
+      label: 'Czas w drodze',
+      unit: 'h',
+      decimals: 1,
+      scalesWithHorizon: true,
+      lowerIsBetter: true,
+      current: homeHours,
+      next: analysis.totalHoursPerWeek,
+    },
+    {
+      id: 'cost',
+      label: 'Koszt dojazdów',
+      unit: 'zł',
+      decimals: 0,
+      scalesWithHorizon: true,
+      lowerIsBetter: true,
+      current: homeCost,
+      next: analysis.totalWeeklyCostPln,
+    },
+    {
+      id: 'co2',
+      label: 'Emisja CO₂',
+      unit: 'kg',
+      decimals: 1,
+      scalesWithHorizon: true,
+      lowerIsBetter: true,
+      current: homeCo2,
+      next: analysis.totalWeeklyCo2Kg,
+    },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl lg:max-w-4xl max-h-[88vh] overflow-y-auto font-sans p-6 rounded-2xl">
+      <DialogContent className="sm:max-w-3xl max-h-[88vh] overflow-y-auto font-sans p-6 rounded-2xl">
         <DialogHeader className="space-y-1.5 border-b border-border/60 pb-3">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
             <SparklesIcon className="size-3.5 text-amber-500" />
@@ -145,7 +274,7 @@ export function AnalyticsDetailsDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* GŁÓWNY WYNIK COMMUTE SCORE */}
+          {/* WYNIK OGÓLNY */}
           <div className="p-4 rounded-xl border border-border bg-card/60 shadow-xs space-y-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -156,334 +285,311 @@ export function AnalyticsDetailsDialog({
             </div>
 
             <div className="flex items-center gap-4">
-            <div
-              className={`flex flex-col items-center justify-center size-20 rounded-2xl border-2 ${getScoreColor(
-                analysis.score
-              )} shadow-sm shrink-0`}
-            >
-              <span className="text-2xl font-black leading-none">{analysis.score}</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 mt-1">
-                Score
-              </span>
-            </div>
-
-            <div className="space-y-1 min-w-0">
-              <div className="text-xs font-bold text-foreground">
-                {analysis.comparisonToHome && analysis.comparisonToHome.hasReference
-                  ? `Ocena zmiany lokalizacji (${analysis.comparisonToHome.scoreDelta >= 0 ? '+' : ''}${analysis.comparisonToHome.scoreDelta} pkt vs obecne mieszkanie)`
-                  : 'Ocena potencjału komunikacyjnego'}
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {analysis.comparisonToHome && analysis.comparisonToHome.hasReference
-                  ? analysis.comparisonToHome.scoreDelta >= 0
-                    ? `Wybór tej lokalizacji podnosi Twój CommuteScore z ${analysis.comparisonToHome.homeScore} do ${analysis.score} punktów, znacząco redukując czas spędzany w korkach.`
-                    : `Ta lokalizacja obniża Twój CommuteScore z ${analysis.comparisonToHome.homeScore} do ${analysis.score} punktów ze względu na większą odległość od Twoich stałych celów.`
-                  : getScoreAssessment(analysis.score)}
-              </p>
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-0.5">
-                <CheckCircle2Icon className="size-3.5 shrink-0" />
-                <span>Wyliczone na podstawie realnych tras i prędkości ruchu w Krakowie</span>
-              </div>
-            </div>
-            </div>
-          </div>
-
-          {/* DWA KAFELKI KPI: CZAS I ŚRODOWISKO */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* KARTA CZASU */}
-            <div className="p-3.5 rounded-xl border border-border bg-card space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <ClockIcon className="size-3.5 text-primary" />
-                  Budżet czasowy
+              <div
+                className={`flex flex-col items-center justify-center size-20 rounded-2xl border-2 ${getScoreColor(
+                  analysis.score
+                )} shadow-sm shrink-0`}
+              >
+                <span className="text-2xl font-black leading-none">{analysis.score}</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 mt-1">
+                  Score
                 </span>
-                <MethodologyHint tooltip={timeTooltip} />
               </div>
-
-              <div className="w-fit text-2xl font-bold tracking-tight text-foreground">
-                {analysis.totalHoursPerWeek} h
-                <span className="text-xs font-normal text-muted-foreground ml-1">/ tydzień</span>
-              </div>
-
-              <p className="text-[10px] text-muted-foreground leading-snug">
-                Każda wizyta liczona jest w obie strony (dojazd + powrót), czyli podany czas jednorazowy
-                mnożymy przez liczbę wizyt w tygodniu i przez 2.
-              </p>
-
-              <div className="pt-2 border-t border-border/50 text-[11px] space-y-1 text-muted-foreground">
-                {comparison && comparison.hasReference ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span>Obecne miejsce zamieszkania:</span>
-                      <span className="font-semibold text-foreground">
-                        {comparison.homeHoursPerWeek} h / tydz.
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Nowe miejsce zamieszkania:</span>
-                      <span className="font-semibold text-foreground">
-                        {analysis.totalHoursPerWeek} h / tydz.
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Różnica czasu:</span>
-                      {comparison.savedHoursPerWeek >= 0 ? (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
-                          <TrendingDownIcon className="size-3" />
-                          -{comparison.savedHoursPerWeek} h (oszczędność)
-                        </span>
-                      ) : (
-                        <span className="text-rose-500 font-bold flex items-center gap-0.5">
-                          <TrendingUpIcon className="size-3" />
-                          +{Math.abs(comparison.savedHoursPerWeek)} h dłużej
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span>Średnia w Krakowie:</span>
-                      <span className="font-semibold text-foreground">7.2 h / tydz.</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Bilans dojazdów:</span>
-                      {analysis.weeklySavingsHours >= 0 ? (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
-                          <TrendingDownIcon className="size-3" />
-                          -{analysis.weeklySavingsHours} h (oszczędność)
-                        </span>
-                      ) : (
-                        <span className="text-rose-500 font-bold flex items-center gap-0.5">
-                          <TrendingUpIcon className="size-3" />
-                          +{Math.abs(analysis.weeklySavingsHours)} h ponad normę
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* KARTA ŚRODOWISKA (CO2) */}
-            <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
-                  <LeafIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                  Ślad węglowy
-                </span>
-                <MethodologyHint tooltip={co2Tooltip} />
-              </div>
-
-              <div className="w-fit text-2xl font-bold tracking-tight text-foreground">
-                {analysis.totalWeeklyCo2Kg} kg
-                <span className="text-xs font-normal text-muted-foreground ml-1">CO₂ / tydzień</span>
-              </div>
-
-              <div className="pt-2 border-t border-emerald-500/20 text-[11px] space-y-1 text-emerald-800 dark:text-emerald-300">
-                {comparison && comparison.hasReference ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span>Obecne miejsce zamieszkania:</span>
-                      <span className="font-semibold">{comparison.homeCo2Kg} kg CO₂/tydz.</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Nowe miejsce zamieszkania:</span>
-                      <span className="font-semibold">{analysis.totalWeeklyCo2Kg} kg CO₂/tydz.</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Różnica emisji:</span>
-                      {comparison.savedCo2Kg >= 0 ? (
-                        <span className="font-bold flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300">
-                          <TrendingDownIcon className="size-3" />
-                          -{comparison.savedCo2Kg} kg CO₂/tydz.
-                        </span>
-                      ) : (
-                        <span className="font-bold flex items-center gap-0.5 text-rose-500">
-                          <TrendingUpIcon className="size-3" />
-                          +{Math.abs(comparison.savedCo2Kg)} kg CO₂/tydz.
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span>Oszczędność vs auto:</span>
-                      <span className="font-bold flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300">
-                        <TrendingDownIcon className="size-3" />
-                        -{analysis.weeklyCo2SavingsKg} kg CO₂/tydz.
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Kompensacja w drzewach:</span>
-                      <span className="font-semibold">🌲 ≈ {analysis.treesEquivalentWeekly} drzew/rok</span>
-                    </div>
-                  </>
-                )}
+              <div className="space-y-1 min-w-0">
+                <div className="text-xs font-bold text-foreground">
+                  {hasReference
+                    ? `Ocena zmiany lokalizacji (${(comparison?.scoreDelta ?? 0) >= 0 ? '+' : ''}${comparison?.scoreDelta ?? 0} pkt vs obecne miejsce zamieszkania)`
+                    : 'Ocena potencjału komunikacyjnego'}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {hasReference
+                    ? (comparison?.scoreDelta ?? 0) >= 0
+                      ? `Nowe miejsce zamieszkania podnosi CommuteScore z ${comparison?.homeScore} do ${analysis.score} punktów.`
+                      : `Nowe miejsce zamieszkania obniża CommuteScore z ${comparison?.homeScore} do ${analysis.score} punktów.`
+                    : getScoreAssessment(analysis.score)}
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-0.5">
+                  <CheckCircle2Icon className="size-3.5 shrink-0" />
+                  <span>Wyliczone na podstawie realnych tras i prędkości ruchu w Krakowie</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* KARTA BUDŻETU I OSZCZĘDNOŚCI FINANSOWYCH */}
-          <div className="p-3.5 rounded-xl border border-border bg-card space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <WalletIcon className="size-3.5 text-primary" />
-                Analiza budżetu i oszczędności finansowych
-              </span>
-              <MethodologyHint tooltip={costTooltip} />
-            </div>
-
-            {/* KOSZT TYGODNIOWY / MIESIĘCZNY / ROCZNY */}
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Tydzień', value: analysis.totalWeeklyCostPln },
-                { label: 'Miesiąc', value: (analysis.totalWeeklyCostPln * 52) / 12 },
-                { label: 'Rok', value: analysis.totalWeeklyCostPln * 52 },
-              ].map((period) => (
-                <div key={period.label} className="px-2 py-1.5 rounded-lg bg-muted/60 text-center">
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                    {period.label}
-                  </div>
-                  <div className="text-sm font-bold text-foreground tabular-nums mt-0.5">
-                    {formatPln(period.value, 0)} zł
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* RÓŻNICA BUDŻETOWA */}
-            <div className="pt-2 border-t border-border/50 text-[11px] space-y-1 text-muted-foreground">
-              {comparison && comparison.hasReference ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <span>Obecne miejsce zamieszkania:</span>
-                    <span className="font-semibold text-foreground tabular-nums">
-                      {formatPln(comparison.homeWeeklyCostPln, 0)} zł / tydz.
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Nowe miejsce zamieszkania:</span>
-                    <span className="font-semibold text-foreground tabular-nums">
-                      {formatPln(analysis.totalWeeklyCostPln, 0)} zł / tydz.
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Różnica budżetowa:</span>
-                    {comparison.savedCostWeeklyPln >= 0 ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
-                        <TrendingDownIcon className="size-3" />
-                        -{formatPln(comparison.savedCostWeeklyPln, 0)} zł/tydz. (
-                        {formatPln(comparison.savedCostWeeklyPln * 52, 0)} zł/rok)
-                      </span>
-                    ) : (
-                      <span className="text-rose-500 font-bold flex items-center gap-0.5">
-                        <TrendingUpIcon className="size-3" />+
-                        {formatPln(Math.abs(comparison.savedCostWeeklyPln), 0)} zł/tydz. drożej
-                      </span>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <span>Oszczędność vs wariant czysto samochodowy:</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 tabular-nums">
-                    <TrendingDownIcon className="size-3" />
-                    {formatPln(analysis.weeklyCostSavingsVsCarPln, 0)} zł/tydz.
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* TARYFY */}
-            <div className="pt-2 border-t border-border/50 space-y-1.5">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                Taryfy MPK Kraków (Strefa I+II+III, normalne)
-              </span>
-              <div className="grid grid-cols-2 gap-1 text-[11px]">
-                {MPK_TICKETS.map((ticket) => (
-                  <div
-                    key={ticket.label}
-                    className="flex items-center justify-between gap-2 px-2 py-1 rounded-md bg-muted/60"
-                  >
-                    <span className="text-muted-foreground truncate">{ticket.label}</span>
-                    <span className="font-semibold text-foreground tabular-nums shrink-0">
-                      {formatPln(ticket.pricePln, 2)} zł
-                    </span>
-                  </div>
-                ))}
-                <div className="col-span-2 flex items-center justify-between gap-2 px-2 py-1 rounded-md bg-muted/60">
-                  <span className="text-muted-foreground">
-                    Paliwo {formatPln(FUEL_PRICE_PLN_PER_LITER, 2)} zł/l ×{' '}
-                    {formatPln(CAR_FUEL_CONSUMPTION_L_PER_100KM, 1)} l/100 km
-                  </span>
-                  <span className="font-semibold text-foreground tabular-nums shrink-0">
-                    {formatPln(CAR_COST_PER_KM_PLN, 2)} zł/km
-                  </span>
-                </div>
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Rower i spacer: 0,00 zł — transport zeroemisyjny. Koszt biletu dobierany jest do czasu
-                jednego przejazdu, a bilans tygodniowy obejmuje dojazd i powrót.
-              </p>
-            </div>
-          </div>
-
-          {/* TABELA ZESTAWIENIA TRAS I CELÓW */}
-          <div className="space-y-1.5">
-            <span className="text-xs font-semibold text-foreground px-0.5 block">
-              Zestawienie tras i emisji per cel podróży — nowe miejsce zamieszkania (
-              {analysis.routes.length}):
+          {/* PRZEŁĄCZNIK HORYZONTU OSZCZĘDNOŚCI */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+              Horyzont oszczędności
             </span>
+            <div
+              role="tablist"
+              aria-label="Horyzont oszczędności"
+              className="inline-flex items-center gap-0.5 p-0.5 rounded-lg border border-border bg-muted/50"
+            >
+              {HORIZONS.map((item) => {
+                const isActive = horizonId === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setHorizonId(item.id)}
+                    className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                      isActive
+                        ? 'bg-background text-foreground shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            <div className="border border-border rounded-xl overflow-hidden divide-y divide-border/60 bg-card text-xs">
-              {analysis.routes.map((route) => (
+          {/* KAFELKI Z OSZCZĘDNOŚCIAMI */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {tiles.map((tile) => {
+              const isSaving = tile.savedWeekly >= 0;
+              const Icon = tile.icon;
+              return (
                 <div
-                  key={route.destinationId}
-                  className="p-2.5 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                  key={tile.id}
+                  className="p-3.5 rounded-xl border border-border bg-card space-y-2"
                 >
-                  <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span className="text-sm shrink-0">{route.destinationIcon}</span>
-                    <div className="min-w-0">
-                      <div className="font-medium text-foreground truncate">
-                        {route.destinationName}
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
-                        <span>{route.distanceKm} km</span>
-                        <span>•</span>
-                        <span>{route.durationMinutes} min w 1 stronę</span>
-                        <span>•</span>
-                        <span className="capitalize">{route.travelMode}</span>
-                      </div>
-                    </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Icon className="size-3.5 text-primary shrink-0" />
+                      {tile.label}
+                    </span>
+                    <MethodologyHint tooltip={tile.tooltip} />
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <div className="font-mono text-xs font-semibold text-foreground">
-                      {route.durationMinutes} min
-                    </div>
-                    <div
-                      className={`text-[10px] font-mono font-medium ${
-                        (route.co2EmissionKg ?? 0) === 0
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-muted-foreground'
+                  <div className="flex flex-wrap items-baseline gap-1">
+                    <span
+                      className={`text-2xl font-black tabular-nums ${
+                        isSaving ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
                       }`}
                     >
-                      {(route.co2EmissionKg ?? 0) === 0 ? '0 g CO₂' : `${route.co2EmissionKg} kg CO₂`}
-                    </div>
-                    <div
-                      className="text-[10px] font-mono font-medium text-muted-foreground"
-                      title={route.ticketType}
-                    >
-                      {formatPln(route.costPlnPerTrip, 2)} zł / przejazd
-                    </div>
+                      {isSaving ? '−' : '+'}
+                      {formatValue(Math.abs(tile.savedWeekly) * horizon.factor, tile.decimals)}
+                    </span>
+                    <span className="text-xs font-bold text-foreground/80">{tile.unit}</span>
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      {horizon.suffix}
+                    </span>
+                    {isSaving ? (
+                      <TrendingDownIcon className="size-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <TrendingUpIcon className="size-3.5 text-rose-500 shrink-0" />
+                    )}
                   </div>
+
+                  {hasReference ? (
+                    <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                      <span>
+                        obecne{' '}
+                        {formatValue(tile.currentWeekly * horizon.factor, tile.decimals)}{' '}
+                        {tile.unit}
+                      </span>
+                      <span className="text-border">→</span>
+                      <span className="font-semibold text-foreground/80">
+                        nowe {formatValue(tile.nextWeekly * horizon.factor, tile.decimals)} {tile.unit}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-muted-foreground">
+                      oszczędność vs wariant czysto samochodowy
+                    </div>
+                  )}
                 </div>
+              );
+            })}
+          </div>
+
+          {/* ZESTAWIENIE DECYZYJNE: OBECNE vs NOWE MIEJSCE ZAMIESZKANIA */}
+          {hasReference && comparison && (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="px-3.5 py-2.5 border-b border-border/60 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                  Obecne vs nowe miejsce zamieszkania
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  Wartości dla: {horizon.label.toLowerCase()}
+                </span>
+              </div>
+
+              <table className="w-full text-[11px] tabular-nums">
+                <thead>
+                  <tr className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground">
+                    <th className="text-left font-bold px-3.5 py-1.5">Wskaźnik</th>
+                    <th className="text-right font-bold px-2 py-1.5">Obecne</th>
+                    <th className="text-right font-bold px-2 py-1.5">Nowe</th>
+                    <th className="text-right font-bold px-3.5 py-1.5">Zmiana</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {comparisonRows.map((row) => {
+                    const factor = row.scalesWithHorizon ? horizon.factor : 1;
+                    const suffix = row.scalesWithHorizon ? horizon.suffix : '';
+                    const deltaScaled = (row.next - row.current) * factor;
+                    const improves = row.lowerIsBetter ? deltaScaled <= 0 : deltaScaled >= 0;
+                    return (
+                      <tr key={row.id}>
+                        <td className="px-3.5 py-2 text-muted-foreground">
+                          {row.label}
+                          {suffix && (
+                            <span className="text-muted-foreground/70"> {suffix}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-right text-muted-foreground">
+                          {formatValue(row.current * factor, row.decimals)} {row.unit}
+                        </td>
+                        <td className="px-2 py-2 text-right font-semibold text-foreground">
+                          {formatValue(row.next * factor, row.decimals)} {row.unit}
+                        </td>
+                        <td
+                          className={`px-3.5 py-2 text-right font-bold ${
+                            improves
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-rose-500'
+                          }`}
+                        >
+                          <span className="inline-flex items-center justify-end gap-0.5">
+                            {deltaScaled >= 0 ? (
+                              <TrendingUpIcon className="size-3 shrink-0" />
+                            ) : (
+                              <TrendingDownIcon className="size-3 shrink-0" />
+                            )}
+                            {deltaScaled >= 0 ? '+' : '−'}
+                            {formatValue(Math.abs(deltaScaled), row.decimals)} {row.unit}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* SZYBKIE WSKAŹNIKI DOJAZDÓW */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: 'Cele do 15 min', value: `${optimalCount} z ${routes.length}` },
+              { label: 'Średni dojazd', value: `${avgMinutes} min` },
+              {
+                label: 'Najbliższy cel',
+                value: bestRoute ? `${bestRoute.durationMinutes} min` : '—',
+                hint: bestRoute?.destinationName,
+              },
+              {
+                label: 'Najdalszy cel',
+                value: worstRoute ? `${worstRoute.durationMinutes} min` : '—',
+                hint: worstRoute?.destinationName,
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="p-2.5 rounded-lg border border-border bg-muted/30"
+                title={item.hint}
+              >
+                <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground">
+                  {item.label}
+                </div>
+                <div className="text-sm font-bold text-foreground tabular-nums mt-0.5">
+                  {item.value}
+                </div>
+                {item.hint && (
+                  <div className="text-[9px] text-muted-foreground truncate mt-0.5">{item.hint}</div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* MIASTO 15-MINUTOWE — ROZKŁAD CELÓW */}
+          <div className="p-3.5 rounded-xl border border-border bg-card space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                Rozkład dojazdów do celów
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {optimalCount} / {routes.length} w standardzie 15 minut
+              </span>
+            </div>
+            <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+              {[
+                { count: optimalCount, className: 'bg-emerald-500' },
+                { count: moderateCount, className: 'bg-amber-500' },
+                { count: heavyCount, className: 'bg-rose-500' },
+              ].map((segment, index) => (
+                <div
+                  key={index}
+                  className={segment.className}
+                  style={{ width: `${routes.length ? (segment.count / routes.length) * 100 : 0}%` }}
+                />
               ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-emerald-500" /> do 15 min ({optimalCount})
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-amber-500" /> 15–28 min ({moderateCount})
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-rose-500" /> powyżej 28 min ({heavyCount})
+              </span>
             </div>
           </div>
 
+          {/* WNIOSKI */}
+          <div className="p-3.5 rounded-xl border border-border bg-card space-y-2">
+            <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <SparklesIcon className="size-3.5 text-primary" />
+              Wnioski dla nowego miejsca zamieszkania
+            </span>
+            <ul className="text-[11px] text-muted-foreground leading-relaxed space-y-1.5 list-disc pl-4">
+              <li>
+                Tygodniowo w drodze:{' '}
+                <b className="font-semibold text-foreground">{analysis.totalHoursPerWeek} h</b> —{' '}
+                {belowBenchmark ? 'o' : 'ponad'}{' '}
+                <b className="font-semibold text-foreground">
+                  {benchmarkDeltaHours} h {belowBenchmark ? 'mniej' : 'więcej'}
+                </b>{' '}
+                niż średnia krakowska ({KRAKOW_BENCHMARK_HOURS} h).
+              </li>
+              {worstRoute && (
+                <li>
+                  Najwięcej czasu pochłania{' '}
+                  <b className="font-semibold text-foreground">{worstRoute.destinationName}</b> —{' '}
+                  {worstRoute.durationMinutes} min w jedną stronę.
+                </li>
+              )}
+              <li>
+                {yearlyCarSavingPln > 0 ? (
+                  <>
+                    Rezygnacja z samochodu na rzecz obecnych środków transportu to{' '}
+                    <b className="font-semibold text-foreground">
+                      {formatPln(yearlyCarSavingPln, 0)} zł
+                    </b>{' '}
+                    rocznie mniej w budżecie.
+                  </>
+                ) : (
+                  <>
+                    Przy tych trasach same bilety MPK kosztują więcej niż paliwo — najtaniej wypadają{' '}
+                    <b className="font-semibold text-foreground">rower i spacer</b> (0 zł).
+                  </>
+                )}
+              </li>
+              <li>
+                Roczna oszczędność emisji vs wariant samochodowy:{' '}
+                <b className="font-semibold text-foreground">{yearlyCo2SavingKg} kg CO₂</b> — jak
+                posadzenie 🌲 ≈ {analysis.treesEquivalentWeekly} drzew.
+              </li>
+            </ul>
+          </div>
         </div>
 
         <DialogFooter className="pt-2 border-t border-border/60">
