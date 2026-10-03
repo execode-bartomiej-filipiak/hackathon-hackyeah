@@ -17,6 +17,8 @@ import {
   InfoIcon,
   CrosshairIcon,
   LocateFixedIcon,
+  HomeIcon,
+  Building2Icon,
 } from 'lucide-react';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import { calculateCommuteAnalysis, fetchEnhancedCommuteAnalysis } from '@/lib/commute';
@@ -202,15 +204,37 @@ export function Krakow3DMap() {
   const animFrameRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuildingInfo | null>(null);
+  const [homeBuilding, setHomeBuilding] = useState<SelectedBuildingInfo | null>(null);
+  const [referenceBuilding, setReferenceBuilding] = useState<SelectedBuildingInfo | null>(null);
+  const homeBuildingRef = useRef<SelectedBuildingInfo | null>(null);
+  const referenceBuildingRef = useRef<SelectedBuildingInfo | null>(null);
   const [isRotating, setIsRotating] = useState(false);
 
   // Stan profili i celów podróży
   const [profiles, setProfiles] = useState<CommuteProfile[]>(COMMUTE_PROFILES);
   const [activeProfileId, setActiveProfileId] = useState<string>(COMMUTE_PROFILES[0].id);
   const activeProfile = profiles.find((p) => p.id === activeProfileId) || profiles[0];
+  const [hasPresetLoaded, setHasPresetLoaded] = useState(false);
+  const [customDestinations, setCustomDestinations] = useState<CommuteDestination[]>([]);
+
+  const currentDestinations = [
+    ...customDestinations,
+    ...(hasPresetLoaded ? activeProfile.destinations : []),
+  ];
+
+  const currentProfile = {
+    ...activeProfile,
+    destinations: currentDestinations,
+  };
+
+  const activeOriginBuilding = referenceBuilding || homeBuilding || selectedBuilding;
 
   const [isAddingTarget, setIsAddingTarget] = useState(false);
   const isAddingTargetRef = useRef(false);
+  const [isSelectingHome, setIsSelectingHome] = useState(false);
+  const isSelectingHomeRef = useRef(false);
+  const [isSelectingReference, setIsSelectingReference] = useState(false);
+  const isSelectingReferenceRef = useRef(false);
   const activeProfileIdRef = useRef(activeProfileId);
 
   useEffect(() => {
@@ -218,21 +242,50 @@ export function Krakow3DMap() {
   }, [isAddingTarget]);
 
   useEffect(() => {
+    isSelectingHomeRef.current = isSelectingHome;
+  }, [isSelectingHome]);
+
+  useEffect(() => {
+    isSelectingReferenceRef.current = isSelectingReference;
+  }, [isSelectingReference]);
+
+  useEffect(() => {
+    homeBuildingRef.current = homeBuilding;
+  }, [homeBuilding]);
+
+  useEffect(() => {
+    referenceBuildingRef.current = referenceBuilding;
+  }, [referenceBuilding]);
+
+  useEffect(() => {
     activeProfileIdRef.current = activeProfileId;
   }, [activeProfileId]);
 
-  // Klawisz Escape do anulowania celownika
+  // Aktualizacja kursora canvasa mapy przy zmianie trybu
+  useEffect(() => {
+    if (mapRef.current) {
+      mapRef.current.getCanvas().style.cursor =
+        isAddingTarget || isSelectingHome || isSelectingReference ? 'crosshair' : '';
+    }
+  }, [isAddingTarget, isSelectingHome, isSelectingReference]);
+
+  // Klawisz Escape do anulowania celownika lub wyboru
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isAddingTarget) {
-        setIsAddingTarget(false);
+      if (e.key === 'Escape') {
+        if (isAddingTarget) setIsAddingTarget(false);
+        if (isSelectingHome) setIsSelectingHome(false);
+        if (isSelectingReference) setIsSelectingReference(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAddingTarget]);
+  }, [isAddingTarget, isSelectingHome, isSelectingReference]);
 
   const handleUpdateDestinationMode = (destinationId: string, mode: TravelMode) => {
+    setCustomDestinations((prev) =>
+      prev.map((d) => (d.id === destinationId ? { ...d, travelMode: mode } : d))
+    );
     setProfiles((prev) =>
       prev.map((p) =>
         p.id === activeProfile.id
@@ -499,19 +552,22 @@ export function Krakow3DMap() {
       const buildingLayerIds = ['building-3d', 'building'].filter((id) => mapInstance.getLayer(id));
 
       mapInstance.on('mousemove', (e: MapLayerMouseEvent) => {
-        if (isAddingTargetRef.current) {
+        if (
+          isAddingTargetRef.current ||
+          isSelectingHomeRef.current ||
+          isSelectingReferenceRef.current
+        ) {
           mapInstance.getCanvas().style.cursor = 'crosshair';
           return;
         }
 
-        const features = mapInstance.queryRenderedFeatures(e.point, {
-          layers: buildingLayerIds.length ? buildingLayerIds : undefined,
-        });
+        const features = mapInstance.queryRenderedFeatures(e.point);
         const hasBuilding = features.some(
           (f: MapGeoJSONFeature) =>
-            f.layer.type === 'fill-extrusion' ||
-            f.sourceLayer === 'building' ||
-            f.layer.id.includes('building')
+            f.layer.id !== 'selected-building-highlight' &&
+            (f.layer.type === 'fill-extrusion' ||
+              f.sourceLayer === 'building' ||
+              f.layer.id.includes('building'))
         );
         mapInstance.getCanvas().style.cursor = hasBuilding ? 'pointer' : '';
       });
@@ -524,6 +580,7 @@ export function Krakow3DMap() {
           const currentLat = e.lngLat.lat;
           const initialDistrict = getDistrict(currentLng, currentLat);
           setIsAddingTarget(false);
+          isAddingTargetRef.current = false;
 
           setPendingDestination({
             coordinates: [currentLng, currentLat],
@@ -549,12 +606,19 @@ export function Krakow3DMap() {
           return;
         }
 
-        // Tryb standardowy: wybór budynku startowego
-        const features = mapInstance.queryRenderedFeatures(e.point, {
-          layers: buildingLayerIds.length ? buildingLayerIds : undefined,
-        });
+        // Tryb wyboru budynku / miejsca zamieszkania / miejsca odniesienia
+        const isHomeMode = isSelectingHomeRef.current;
+        const isRefMode = isSelectingReferenceRef.current;
 
-        const buildingFeature: MapGeoJSONFeature | undefined = features.find(
+        // Resetujemy tryby wyboru
+        setIsSelectingHome(false);
+        setIsSelectingReference(false);
+        isSelectingHomeRef.current = false;
+        isSelectingReferenceRef.current = false;
+
+        // Szukamy budynku w punkcie kliknięcia, a jeśli brak, to w buforze 12px
+        const features = mapInstance.queryRenderedFeatures(e.point);
+        let buildingFeature = features.find(
           (f: MapGeoJSONFeature) =>
             f.layer.id !== 'selected-building-highlight' &&
             (f.layer.type === 'fill-extrusion' ||
@@ -562,35 +626,68 @@ export function Krakow3DMap() {
               f.layer.id.includes('building'))
         );
 
-        if (buildingFeature) {
-          const props = buildingFeature.properties || {};
-          const height =
-            Number(props.render_height) ||
-            Number(props.height) ||
-            (props.levels ? Number(props.levels) * 3.5 : 16);
-          const levels =
-            Number(props.levels) ||
-            Number(props.building_levels) ||
-            Math.max(1, Math.round(height / 3.5));
-          const initialDistrict = getDistrict(e.lngLat.lng, e.lngLat.lat);
-          const initialTitle = 'Wyszukiwanie adresu...';
-          const type = (props.building as string | undefined) || (props.type as string | undefined) || 'Zabudowa miejska';
+        if (!buildingFeature) {
+          const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
+            [e.point.x - 12, e.point.y - 12],
+            [e.point.x + 12, e.point.y + 12],
+          ];
+          const bboxFeatures = mapInstance.queryRenderedFeatures(bbox);
+          buildingFeature = bboxFeatures.find(
+            (f: MapGeoJSONFeature) =>
+              f.layer.id !== 'selected-building-highlight' &&
+              (f.layer.type === 'fill-extrusion' ||
+                f.sourceLayer === 'building' ||
+                f.layer.id.includes('building'))
+          );
+        }
 
-          const buildingInfo: SelectedBuildingInfo = {
-            name: initialTitle,
-            type,
-            height: Math.round(height),
-            levels,
-            district: initialDistrict,
-            coordinates: [e.lngLat.lng, e.lngLat.lat],
-          };
+        const props = buildingFeature?.properties || {};
+        const height =
+          Number(props.render_height) ||
+          Number(props.height) ||
+          (props.levels ? Number(props.levels) * 3.5 : 18);
+        const levels =
+          Number(props.levels) ||
+          Number(props.building_levels) ||
+          Math.max(1, Math.round(height / 3.5));
+        const initialDistrict = getDistrict(e.lngLat.lng, e.lngLat.lat);
+        const initialTitle = 'Wyszukiwanie adresu...';
+        const type =
+          (props.building as string | undefined) ||
+          (props.type as string | undefined) ||
+          (buildingFeature ? 'Zabudowa miejska' : 'Wskazana lokalizacja');
 
-          setSelectedBuilding(buildingInfo);
+        const buildingInfo: SelectedBuildingInfo = {
+          name: initialTitle,
+          type,
+          height: Math.round(height),
+          levels,
+          district: initialDistrict,
+          coordinates: [e.lngLat.lng, e.lngLat.lat],
+        };
 
-          // Podświetlenie geometrii budynku
-          const source = mapInstance.getSource('selected-building-source');
-          if (source && source.type === 'geojson') {
-            const geoSource = source as GeoJSONSource;
+        if (isRefMode) {
+          setReferenceBuilding(buildingInfo);
+          referenceBuildingRef.current = buildingInfo;
+        } else if (isHomeMode) {
+          setHomeBuilding(buildingInfo);
+          homeBuildingRef.current = buildingInfo;
+        } else {
+          if (!homeBuildingRef.current) {
+            setHomeBuilding(buildingInfo);
+            homeBuildingRef.current = buildingInfo;
+          } else {
+            setReferenceBuilding(buildingInfo);
+            referenceBuildingRef.current = buildingInfo;
+          }
+        }
+        setSelectedBuilding(buildingInfo);
+
+        // Podświetlenie geometrii budynku lub punktu w 3D
+        const source = mapInstance.getSource('selected-building-source');
+        if (source && source.type === 'geojson') {
+          const geoSource = source as GeoJSONSource;
+          if (buildingFeature && buildingFeature.geometry) {
             geoSource.setData({
               type: 'FeatureCollection',
               features: [
@@ -609,26 +706,64 @@ export function Krakow3DMap() {
                 },
               ],
             });
+          } else {
+            const d = 0.00015;
+            const lng = e.lngLat.lng;
+            const lat = e.lngLat.lat;
+            geoSource.setData({
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  properties: {
+                    render_height: 18,
+                    height: 18,
+                    render_min_height: 0,
+                    min_height: 0,
+                  },
+                  geometry: {
+                    type: 'Polygon',
+                    coordinates: [
+                      [
+                        [lng - d, lat - d],
+                        [lng + d, lat - d],
+                        [lng + d, lat + d],
+                        [lng - d, lat + d],
+                        [lng - d, lat - d],
+                      ],
+                    ],
+                  },
+                },
+              ],
+            });
           }
+        }
 
-          // Tooltip 3D na mapie - bezpieczne usunięcie poprzedniego dymka bez resetu stanu
-          if (popupRef.current) {
-            isSwitchingBuildingRef.current = true;
-            popupRef.current.remove();
-            popupRef.current = null;
-            isSwitchingBuildingRef.current = false;
-          }
+        // Tooltip 3D na mapie - bezpieczne usunięcie poprzedniego dymka bez resetu stanu
+        if (popupRef.current) {
+          isSwitchingBuildingRef.current = true;
+          popupRef.current.remove();
+          popupRef.current = null;
+          isSwitchingBuildingRef.current = false;
+        }
 
-          const popupElement = document.createElement('div');
-          popupElement.className = 'p-1 text-slate-900 font-sans';
-          popupElement.innerHTML = `
-            <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
-              <span>📍</span> <span class="building-address-title">${initialTitle}</span>
-            </div>
-            <div style="font-size: 11px; color: #475569;">
-              Dzielnica: <strong style="color: #0f172a;" class="building-district-text">${initialDistrict}</strong>
-            </div>
-          `;
+        const labelMode = isRefMode
+          ? '🏢 Miejsce odniesienia'
+          : isHomeMode
+          ? '🏠 Miejsce zamieszkania'
+          : '📍 Wybrana lokalizacja';
+
+        const popupElement = document.createElement('div');
+        popupElement.className = 'p-1 text-slate-900 font-sans';
+        popupElement.innerHTML = `
+          <div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: #475569; margin-bottom: 2px;">
+            ${labelMode}
+          </div>
+          <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;" class="building-address-title">${initialTitle}</div>
+          <div style="font-size: 11px; color: #475569;">
+            Dzielnica: <strong style="color: #0f172a;" class="building-district-text">${initialDistrict}</strong>
+          </div>
+        `;
 
           const newPopup = new maplibregl.Popup({
             offset: [0, -12],
@@ -659,7 +794,7 @@ export function Krakow3DMap() {
               if (districtEl) districtEl.textContent = resolved.district;
             }
 
-            setSelectedBuilding((prev) => {
+            const updateResolved = (prev: SelectedBuildingInfo | null) => {
               if (!prev) return null;
               if (prev.coordinates[0] === currentLng && prev.coordinates[1] === currentLat) {
                 return {
@@ -669,10 +804,12 @@ export function Krakow3DMap() {
                 };
               }
               return prev;
-            });
-          });
+            };
 
-        }
+            setSelectedBuilding(updateResolved);
+            setHomeBuilding(updateResolved);
+            setReferenceBuilding(updateResolved);
+          });
       });
 
     });
@@ -692,14 +829,14 @@ export function Krakow3DMap() {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    if (selectedBuilding) {
+    if (activeOriginBuilding && currentDestinations.length > 0) {
       // 1. Natychmiastowe wstępne wyniki w panelu HUD i markery celów
       const baseAnalysis = calculateCommuteAnalysis(
-        selectedBuilding.coordinates,
-        activeProfile.destinations
+        activeOriginBuilding.coordinates,
+        currentDestinations
       );
       setCommuteAnalysis(baseAnalysis);
-      updateDestinationMarkers(map, activeProfile.destinations, baseAnalysis.routes);
+      updateDestinationMarkers(map, currentDestinations, baseAnalysis.routes);
 
       // Czyścimy poprzednie trajektorie, by uniknąć przeskakiwania
       updateTrajectoriesLayer(map, []);
@@ -721,8 +858,8 @@ export function Krakow3DMap() {
 
       // 3. Asynchroniczne pobranie prawdziwych tras po ulicach Krakowa (OSRM)
       fetchEnhancedCommuteAnalysis(
-        selectedBuilding.coordinates,
-        activeProfile.destinations,
+        activeOriginBuilding.coordinates,
+        currentDestinations,
         'transit',
         controller.signal
       )
@@ -732,7 +869,7 @@ export function Krakow3DMap() {
           setCommuteAnalysis(realAnalysis);
           routesRef.current = realAnalysis.routes;
           updateTrajectoriesLayer(mapRef.current, realAnalysis.routes);
-          updateDestinationMarkers(mapRef.current, activeProfile.destinations, realAnalysis.routes);
+          updateDestinationMarkers(mapRef.current, currentDestinations, realAnalysis.routes);
         })
         .catch(() => {
           clearTimeout(fallbackTimer);
@@ -750,16 +887,18 @@ export function Krakow3DMap() {
       setCommuteAnalysis(null);
       routesRef.current = [];
       updateTrajectoriesLayer(map, []);
-      updateDestinationMarkers(map, activeProfile.destinations, []);
+      updateDestinationMarkers(map, currentDestinations, []);
       const pulseSrc = map.getSource('commute-pulses-source');
       if (pulseSrc && pulseSrc.type === 'geojson') {
         (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
       }
     }
   }, [
-    selectedBuilding,
+    activeOriginBuilding,
     activeProfile,
     mapLoaded,
+    hasPresetLoaded,
+    customDestinations,
     updateTrajectoriesLayer,
     updateDestinationMarkers,
   ]);
@@ -876,6 +1015,8 @@ export function Krakow3DMap() {
     if (isSwitchingBuildingRef.current) return;
     isSwitchingBuildingRef.current = true;
     setSelectedBuilding(null);
+    setHomeBuilding(null);
+    setReferenceBuilding(null);
     routesRef.current = [];
     if (popupRef.current) {
       popupRef.current.remove();
@@ -883,7 +1024,11 @@ export function Krakow3DMap() {
     }
     if (mapRef.current) {
       updateTrajectoriesLayer(mapRef.current, []);
-      updateDestinationMarkers(mapRef.current, activeProfile.destinations, []);
+      updateDestinationMarkers(
+        mapRef.current,
+        currentDestinations,
+        []
+      );
       const selSrc = mapRef.current.getSource('selected-building-source');
       if (selSrc && selSrc.type === 'geojson') {
         (selSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
@@ -898,11 +1043,11 @@ export function Krakow3DMap() {
 
   // Fokus na trasie do wybranego celu z panelu HUD
   const handleFocusDestination = (route: CommuteRouteResult) => {
-    if (!mapRef.current || !selectedBuilding) return;
+    if (!mapRef.current || !activeOriginBuilding) return;
 
     // Wyznaczamy środek trasy do płynnego objęcia wzrokiem
-    const midLng = (selectedBuilding.coordinates[0] + route.coordinates[0]) / 2;
-    const midLat = (selectedBuilding.coordinates[1] + route.coordinates[1]) / 2;
+    const midLng = (activeOriginBuilding.coordinates[0] + route.coordinates[0]) / 2;
+    const midLat = (activeOriginBuilding.coordinates[1] + route.coordinates[1]) / 2;
 
     mapRef.current.flyTo({
       center: [midLng, midLat],
@@ -915,9 +1060,9 @@ export function Krakow3DMap() {
 
   // Centrowanie widoku mapy na wybranym aktualnie budynku (punkcie)
   const handleCenterOnSelectedBuilding = () => {
-    if (!mapRef.current || !selectedBuilding) return;
+    if (!mapRef.current || !activeOriginBuilding) return;
     mapRef.current.flyTo({
-      center: selectedBuilding.coordinates,
+      center: activeOriginBuilding.coordinates,
       zoom: 16.5,
       pitch: 62,
       duration: 1200,
@@ -928,6 +1073,8 @@ export function Krakow3DMap() {
   // Prezentacyjny przycisk wyboru budynku na scenie
   const handleSelectDemoOrigin = () => {
     if (!mapRef.current) return;
+
+    setHasPresetLoaded(true);
 
     if (popupRef.current) {
       isSwitchingBuildingRef.current = true;
@@ -946,6 +1093,7 @@ export function Krakow3DMap() {
       coordinates: demoCoords,
     };
 
+    setHomeBuilding(demoBuilding);
     setSelectedBuilding(demoBuilding);
 
     // Podświetlenie w 3D
@@ -978,10 +1126,10 @@ export function Krakow3DMap() {
       essential: true,
       duration: 1800,
     });
-
   };
   // Usuwanie zdefiniowanego celu
   const handleRemoveDestination = (destinationId: string) => {
+    setCustomDestinations((prev) => prev.filter((d) => d.id !== destinationId));
     setProfiles((prev) =>
       prev.map((p) =>
         p.id === activeProfile.id
@@ -1012,6 +1160,20 @@ export function Krakow3DMap() {
   }) => {
     if (data.id) {
       // Aktualizacja istniejącego celu
+      setCustomDestinations((prev) =>
+        prev.map((d) =>
+          d.id === data.id
+            ? {
+                ...d,
+                name: data.name,
+                category: data.category,
+                icon: data.icon,
+                frequencyPerWeek: data.frequencyPerWeek,
+                travelMode: data.travelMode,
+              }
+            : d
+        )
+      );
       setProfiles((prev) =>
         prev.map((p) =>
           p.id === activeProfile.id
@@ -1045,13 +1207,7 @@ export function Krakow3DMap() {
         travelMode: data.travelMode,
       };
 
-      setProfiles((prev) =>
-        prev.map((p) =>
-          p.id === activeProfile.id
-            ? { ...p, destinations: [...p.destinations, newDest] }
-            : p
-        )
-      );
+      setCustomDestinations((prev) => [...prev, newDest]);
     }
 
     setIsAddDialogOpen(false);
@@ -1066,7 +1222,9 @@ export function Krakow3DMap() {
       <div
         ref={mapContainerRef}
         className="w-full h-full bg-slate-950"
-        style={{ cursor: isAddingTarget ? 'crosshair' : 'grab' }}
+        style={{
+          cursor: isAddingTarget || isSelectingHome || isSelectingReference ? 'crosshair' : 'grab',
+        }}
       />
 
       {/* PŁYWAJĄCY BANER CELOWNIKA */}
@@ -1081,6 +1239,42 @@ export function Krakow3DMap() {
             variant="secondary"
             onClick={() => setIsAddingTarget(false)}
             className="h-6 px-2 text-[11px] bg-white text-rose-700 hover:bg-white/90 font-medium"
+          >
+            Anuluj (Esc)
+          </Button>
+        </div>
+      )}
+
+      {/* PŁYWAJĄCY BANER WYBORU MIEJSCA ZAMIESZKANIA */}
+      {isSelectingHome && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-amber-600 text-white px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-3">
+          <HomeIcon className="size-4 animate-bounce" />
+          <span className="text-xs font-semibold">
+            Tryb wyboru miejsca zamieszkania: Kliknij dowolny budynek 3D na mapie
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setIsSelectingHome(false)}
+            className="h-6 px-2 text-[11px] bg-white text-amber-900 hover:bg-white/90 font-medium"
+          >
+            Anuluj (Esc)
+          </Button>
+        </div>
+      )}
+
+      {/* PŁYWAJĄCY BANER WYBORU MIEJSCA ODNIESIENIA */}
+      {isSelectingReference && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-blue-600 text-white px-4 py-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-top-3">
+          <Building2Icon className="size-4 animate-bounce" />
+          <span className="text-xs font-semibold">
+            Tryb wyboru miejsca odniesienia: Kliknij budynek 3D na mapie
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setIsSelectingReference(false)}
+            className="h-6 px-2 text-[11px] bg-white text-blue-900 hover:bg-white/90 font-medium"
           >
             Anuluj (Esc)
           </Button>
@@ -1114,9 +1308,9 @@ export function Krakow3DMap() {
           variant="outline"
           size="sm"
           onClick={handleCenterOnSelectedBuilding}
-          disabled={!selectedBuilding}
+          disabled={!activeOriginBuilding}
           className="size-7 p-0 disabled:opacity-50"
-          title={selectedBuilding ? `Wycentruj na: ${selectedBuilding.name}` : 'Wybierz budynek na mapie, aby wycentrować'}
+          title={activeOriginBuilding ? `Wycentruj na: ${activeOriginBuilding.name}` : 'Wskaż miejsce zamieszkania lub budynek na mapie'}
           aria-label="Centruj na wybranym punkcie"
         >
           <LocateFixedIcon className="size-3.5 text-primary" />
@@ -1138,13 +1332,39 @@ export function Krakow3DMap() {
 
       {/* PŁYWAJĄCY PANEL COMMUTE HUD (PRAWY GÓRNY RÓG) */}
       <CommuteHud
-        activeProfile={activeProfile}
+        activeProfile={currentProfile}
         analysis={commuteAnalysis}
-        selectedBuildingName={selectedBuilding?.name}
+        homeBuildingName={homeBuilding?.name}
+        referenceBuildingName={referenceBuilding?.name}
+        selectedBuildingName={activeOriginBuilding?.name}
+        hasPresetLoaded={hasPresetLoaded}
         onFocusDestination={handleFocusDestination}
         onSelectDemoOrigin={handleSelectDemoOrigin}
         isAddingTarget={isAddingTarget}
-        onToggleAddTarget={() => setIsAddingTarget(!isAddingTarget)}
+        onToggleAddTarget={() => {
+          if (!isAddingTarget) {
+            setIsSelectingHome(false);
+            setIsSelectingReference(false);
+          }
+          setIsAddingTarget(!isAddingTarget);
+        }}
+        isSelectingHome={isSelectingHome}
+        onToggleSelectHome={() => {
+          if (!isSelectingHome) {
+            setIsAddingTarget(false);
+            setIsSelectingReference(false);
+          }
+          setIsSelectingHome(!isSelectingHome);
+        }}
+        isSelectingReference={isSelectingReference}
+        onToggleSelectReference={() => {
+          if (!isSelectingReference) {
+            setIsAddingTarget(false);
+            setIsSelectingHome(false);
+          }
+          setIsSelectingReference(!isSelectingReference);
+        }}
+        onClearSelection={handleClearSelection}
         onRemoveDestination={handleRemoveDestination}
         onUpdateDestinationMode={handleUpdateDestinationMode}
         onEditDestination={handleOpenEditDestination}
