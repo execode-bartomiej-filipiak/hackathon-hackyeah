@@ -130,7 +130,7 @@ export function AddDestinationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md border-border/80 bg-background/95 backdrop-blur-md shadow-2xl rounded-2xl p-5 space-y-4">
+      <DialogContent className="sm:max-w-xl border-border/80 bg-background/95 backdrop-blur-md shadow-2xl rounded-2xl p-6 space-y-4">
         <DialogHeader className="space-y-1">
           <div className="flex items-center gap-2 text-primary font-semibold text-xs">
             {isEdit ? <PencilIcon className="size-4" /> : <TargetIcon className="size-4" />}
@@ -182,7 +182,7 @@ export function AddDestinationDialog({
                     }`}
                   >
                     <span>{cat.icon}</span>
-                    <span className="truncate text-[11px]">{cat.label.split(' ')[0]}</span>
+                    <span className="truncate text-[11px] sm:text-xs">{cat.label}</span>
                   </button>
                 );
               })}
