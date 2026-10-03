@@ -312,83 +312,16 @@ export async function fetchOsmStreetRoute(
 }
 
 /**
- * Asynchroniczna analiza wzbogacona o realne trasy uliczne (OSRM)
- * Równolegle pobiera trasy uliczne z gwarantowanym fallbackiem na model estymacyjny.
+ * Analiza dojazdów do punktów życia (Trajektorie 3D)
+ * Zwraca bezpośrednie trajektorie łukowe oraz estymację czasów, jak w początkowych wersjach projektu.
  */
 export async function fetchEnhancedCommuteAnalysis(
   origin: [number, number],
   destinations: CommuteDestination[],
   fallbackMode: TravelMode = 'transit',
-  signal?: AbortSignal
+  _signal?: AbortSignal
 ): Promise<CommuteAnalysis> {
-  // Najpierw baza z obliczeń wstępnych
-  const baseAnalysis = calculateCommuteAnalysis(origin, destinations, fallbackMode);
-
-  // Pobieramy trasy drogowe równolegle
-  const routePromises = baseAnalysis.routes.map(async (baseRoute) => {
-    const dest = destinations.find((d) => d.id === baseRoute.destinationId);
-    if (!dest) return baseRoute;
-
-    const effectiveMode = dest.travelMode || fallbackMode;
-    const realRoute = await fetchOsmStreetRoute(origin, dest.coordinates, effectiveMode, signal);
-
-    if (realRoute && realRoute.coordinates.length >= 2) {
-      const co2EmissionKg = Number(
-        (realRoute.distanceKm * getCo2FactorKgPerKm(effectiveMode)).toFixed(2)
-      );
-      return {
-        ...baseRoute,
-        distanceKm: realRoute.distanceKm,
-        durationMinutes: realRoute.durationMinutes,
-        status: getRouteStatus(realRoute.durationMinutes),
-        trajectoryCoordinates: realRoute.coordinates,
-        isRealRoute: true,
-        co2EmissionKg,
-      };
-    }
-
-    return baseRoute;
-  });
-
-  const updatedRoutes = await Promise.all(routePromises);
-
-  // Przeliczenie bilansu tygodniowego na bazie realnych czasów i dystansów
-  let totalWeeklyMinutes = 0;
-  let totalWeeklyCo2KgRaw = 0;
-  let totalCarBaselineCo2KgRaw = 0;
-
-  updatedRoutes.forEach((route) => {
-    const dest = destinations.find((d) => d.id === route.destinationId);
-    const freq = dest ? dest.frequencyPerWeek : 2;
-    const roundTrips = freq * 2;
-    totalWeeklyMinutes += route.durationMinutes * roundTrips;
-    const co2Trip = route.co2EmissionKg ?? (route.distanceKm * getCo2FactorKgPerKm(route.travelMode));
-    totalWeeklyCo2KgRaw += co2Trip * roundTrips;
-    totalCarBaselineCo2KgRaw += (route.distanceKm * getCo2FactorKgPerKm('driving')) * roundTrips;
-  });
-
-  const totalHoursPerWeek = Number((totalWeeklyMinutes / 60).toFixed(1));
-  const KRAKOW_BENCHMARK_HOURS = 7.2;
-  const weeklySavingsHours = Number((KRAKOW_BENCHMARK_HOURS - totalHoursPerWeek).toFixed(1));
-
-  const totalWeeklyCo2Kg = Number(totalWeeklyCo2KgRaw.toFixed(1));
-  const weeklyCo2SavingsKg = Number(
-    Math.max(0, totalCarBaselineCo2KgRaw - totalWeeklyCo2KgRaw).toFixed(1)
-  );
-  const treesEquivalentWeekly = Math.max(1, Math.round(weeklyCo2SavingsKg / 0.42));
-
-  const rawScore = 100 - (totalHoursPerWeek / 12) * 60;
-  const score = Math.max(12, Math.min(98, Math.round(rawScore)));
-
-  return {
-    score,
-    totalHoursPerWeek,
-    weeklySavingsHours,
-    totalWeeklyCo2Kg,
-    weeklyCo2SavingsKg,
-    treesEquivalentWeekly,
-    routes: updatedRoutes,
-  };
+  return calculateCommuteAnalysis(origin, destinations, fallbackMode);
 }
 
 /**

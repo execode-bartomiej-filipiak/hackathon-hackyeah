@@ -23,7 +23,6 @@ import { toast } from 'sonner';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import {
   calculateCommuteAnalysis,
-  fetchEnhancedCommuteAnalysis,
   calculateRelationalComparison,
 } from '@/lib/commute';
 import { CommuteHud } from '@/components/commute-hud';
@@ -805,99 +804,8 @@ export function Krakow3DMap() {
 
       setCommuteAnalysis(baseAnalysis);
       routesRef.current = baseAnalysis.routes;
+      updateTrajectoriesLayer(map, baseAnalysis.routes);
       updateDestinationMarkers(map, currentDestinations, baseAnalysis.routes);
-
-      // Czyścimy poprzednie trajektorie, by uniknąć przeskakiwania
-      updateTrajectoriesLayer(map, []);
-      const pulseSrc = map.getSource('commute-pulses-source');
-      if (pulseSrc && pulseSrc.type === 'geojson') {
-        (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
-      }
-
-      // 2. Zaplanowanie awaryjnego fallbacku na łuki dopiero po dłuższym czasie (6.5s)
-      const controller = new AbortController();
-      let isCancelled = false;
-
-      const fallbackTimer = setTimeout(() => {
-        if (isCancelled || !mapRef.current) return;
-        const targetFallback =
-          activeFocusPointRef.current === 'home' && cachedAnalysisRef.current.home
-            ? cachedAnalysisRef.current.home
-            : baseAnalysis;
-        routesRef.current = targetFallback.routes;
-        updateTrajectoriesLayer(mapRef.current, targetFallback.routes);
-      }, 6500);
-
-      // 3. Asynchroniczne pobranie prawdziwych tras po ulicach Krakowa (OSRM)
-      if (referenceBuilding && homeBuilding) {
-        Promise.all([
-          fetchEnhancedCommuteAnalysis(
-            referenceBuilding.coordinates,
-            currentDestinations,
-            'transit',
-            controller.signal
-          ),
-          fetchEnhancedCommuteAnalysis(
-            homeBuilding.coordinates,
-            currentDestinations,
-            'transit',
-            controller.signal
-          ),
-        ])
-          .then(([refReal, homeReal]) => {
-            clearTimeout(fallbackTimer);
-            if (isCancelled || !mapRef.current) return;
-            refReal.comparisonToHome = calculateRelationalComparison(refReal, homeReal);
-
-            cachedAnalysisRef.current.home = homeReal;
-            cachedAnalysisRef.current.reference = refReal;
-
-            const targetAnalysis =
-              activeFocusPointRef.current === 'home' ? homeReal : refReal;
-            setCommuteAnalysis(targetAnalysis);
-            routesRef.current = targetAnalysis.routes;
-            updateTrajectoriesLayer(mapRef.current, targetAnalysis.routes);
-            updateDestinationMarkers(mapRef.current, currentDestinations, targetAnalysis.routes);
-          })
-          .catch(() => {
-            clearTimeout(fallbackTimer);
-            if (isCancelled || !mapRef.current) return;
-            const targetFallback =
-              activeFocusPointRef.current === 'home' && cachedAnalysisRef.current.home
-                ? cachedAnalysisRef.current.home
-                : baseAnalysis;
-            routesRef.current = targetFallback.routes;
-            updateTrajectoriesLayer(mapRef.current, targetFallback.routes);
-          });
-      } else {
-        fetchEnhancedCommuteAnalysis(
-          activeOriginBuilding.coordinates,
-          currentDestinations,
-          'transit',
-          controller.signal
-        )
-          .then((realAnalysis) => {
-            clearTimeout(fallbackTimer);
-            if (isCancelled || !mapRef.current) return;
-            cachedAnalysisRef.current.home = realAnalysis;
-            setCommuteAnalysis(realAnalysis);
-            routesRef.current = realAnalysis.routes;
-            updateTrajectoriesLayer(mapRef.current, realAnalysis.routes);
-            updateDestinationMarkers(mapRef.current, currentDestinations, realAnalysis.routes);
-          })
-          .catch(() => {
-            clearTimeout(fallbackTimer);
-            if (isCancelled || !mapRef.current) return;
-            routesRef.current = baseAnalysis.routes;
-            updateTrajectoriesLayer(mapRef.current, baseAnalysis.routes);
-          });
-      }
-
-      return () => {
-        isCancelled = true;
-        clearTimeout(fallbackTimer);
-        controller.abort();
-      };
     } else {
       setCommuteAnalysis(null);
       routesRef.current = [];
