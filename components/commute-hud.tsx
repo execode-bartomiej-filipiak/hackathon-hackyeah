@@ -402,7 +402,12 @@ export function CommuteHud({
             /* WYNIKI ANALIZY COMMUTE SCORE */
             <div className="space-y-3 animate-in fade-in">
               {/* 1. KPI: WYEKSPONOWANA OSZCZĘDNOŚĆ CZASU + SCORE, CO₂ ZDEEMFATYZOWANE */}
-              <div className="p-3.5 rounded-xl border border-border bg-card shadow-xs space-y-3">
+              <button
+                type="button"
+                onClick={() => setIsAnalyticsModalOpen(true)}
+                title="Kliknij, aby otworzyć raport mobilności i ekologii 3D"
+                className="group block w-full text-left p-3.5 rounded-xl border border-border bg-card shadow-xs space-y-3 transition-all cursor-pointer hover:border-primary/45 hover:bg-primary/[0.03] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              >
                 <div className="flex items-center justify-between gap-3">
                   {/* LEWA STRONA: BOHATER — ZAOSZCZĘDZONY CZAS W TYGODNIU */}
                   <div className="min-w-0 flex-1">
@@ -459,22 +464,9 @@ export function CommuteHud({
                     </span>
                     CO₂
                   </span>
+                  <ExternalLinkIcon className="size-3 ml-auto shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity" />
                 </div>
-
-                {/* PRZYCISK OTWARCIA MODALU ZE SZCZEGÓŁAMI */}
-                <button
-                  type="button"
-                  onClick={() => setIsAnalyticsModalOpen(true)}
-                  className="w-full pt-1.5 border-t border-border/50 flex items-center justify-between text-[10px] text-muted-foreground hover:text-foreground font-medium transition-colors group cursor-pointer"
-                >
-                  <span className="group-hover:text-primary transition-colors">
-                    {analysis.comparisonToHome && analysis.comparisonToHome.hasReference
-                      ? 'Porównanie analityki i ekologii z mieszkaniem'
-                      : 'Szczegóły analityki i ekologii'}
-                  </span>
-                  <ExternalLinkIcon className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
-                </button>
-              </div>
+              </button>
 
               {/* 2. MIEJSCE ZAMIESZKANIA I ODNIESIENIA W TRYBIE ANALIZY */}
               {(effectiveHomeName || effectiveRefName) && (
