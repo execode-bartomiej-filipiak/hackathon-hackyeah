@@ -20,6 +20,7 @@ import {
   HomeIcon,
   Building2Icon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import {
   calculateCommuteAnalysis,
@@ -1126,6 +1127,9 @@ export function Krakow3DMap() {
     setSelectedBuilding(null);
     setHomeBuilding(null);
     setReferenceBuilding(null);
+    homeBuildingRef.current = null;
+    referenceBuildingRef.current = null;
+    setCommuteAnalysis(null);
     setActiveFocusPoint('reference');
     activeFocusPointRef.current = 'reference';
     cachedAnalysisRef.current = {};
@@ -1136,11 +1140,8 @@ export function Krakow3DMap() {
     }
     if (mapRef.current) {
       updateTrajectoriesLayer(mapRef.current, []);
-      updateDestinationMarkers(
-        mapRef.current,
-        currentDestinations,
-        []
-      );
+      destinationMarkersRef.current.forEach((m) => m.remove());
+      destinationMarkersRef.current = [];
       const selSrc = mapRef.current.getSource('selected-building-source');
       if (selSrc && selSrc.type === 'geojson') {
         (selSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
@@ -1152,6 +1153,74 @@ export function Krakow3DMap() {
     }
     isSwitchingBuildingRef.current = false;
   };
+
+  // Całkowity reset danych analizy, celów, presetów i widoku kamery 3D
+  const handleResetData = () => {
+    if (isSwitchingBuildingRef.current) return;
+    isSwitchingBuildingRef.current = true;
+
+    // 1. Reset zaznaczonych budynków i analiz
+    setSelectedBuilding(null);
+    setHomeBuilding(null);
+    setReferenceBuilding(null);
+    homeBuildingRef.current = null;
+    referenceBuildingRef.current = null;
+    setCommuteAnalysis(null);
+    setActiveFocusPoint('reference');
+    activeFocusPointRef.current = 'reference';
+    cachedAnalysisRef.current = {};
+    routesRef.current = [];
+
+    // 2. Reset celów, profili i presetów
+    setHasPresetLoaded(false);
+    setCustomDestinations([]);
+    setProfiles(COMMUTE_PROFILES);
+    setActiveProfileId(COMMUTE_PROFILES[0].id);
+
+    // 3. Reset trybów interakcji
+    setIsSelectingHome(false);
+    setIsSelectingReference(false);
+    setIsAddingTarget(false);
+    isSelectingHomeRef.current = false;
+    isSelectingReferenceRef.current = false;
+    isAddingTargetRef.current = false;
+
+    // 4. Reset obrotu i popupów
+    setIsRotating(false);
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
+
+    // 5. Wyczyszczenie warstw graficznych na mapie 3D
+    if (mapRef.current) {
+      updateTrajectoriesLayer(mapRef.current, []);
+      destinationMarkersRef.current.forEach((m) => m.remove());
+      destinationMarkersRef.current = [];
+      const selSrc = mapRef.current.getSource('selected-building-source');
+      if (selSrc && selSrc.type === 'geojson') {
+        (selSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+      }
+      const pulseSrc = mapRef.current.getSource('commute-pulses-source');
+      if (pulseSrc && pulseSrc.type === 'geojson') {
+        (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+      }
+
+      // 6. Płynny powrót kamery do panoramy Krakowa
+      mapRef.current.easeTo({
+        center: [19.9373, 50.0617],
+        zoom: 15.5,
+        pitch: 62,
+        bearing: -20,
+        essential: true,
+        duration: 1200,
+      });
+    }
+
+    isSwitchingBuildingRef.current = false;
+    toast.info('Zresetowano dane analizy dojazdów');
+  };
+
 
   // Wyświetlenie podświetlenia budynku 3D oraz dymka informacyjnego
   const showBuildingHighlightAndTooltip = (
@@ -1646,19 +1715,6 @@ export function Krakow3DMap() {
           <LocateFixedIcon className="size-3.5 text-primary" />
         </Button>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            if (mapRef.current) {
-              mapRef.current.easeTo({ pitch: 62, bearing: -20 });
-            }
-          }}
-          className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
-        >
-          Reset
-        </Button>
-
         <AddressSearch onSelectLocation={handleSelectSearchResult} />
       </div>
       {/* PŁYWAJĄCY PANEL COMMUTE HUD (PRAWY GÓRNY RÓG) */}
@@ -1701,6 +1757,7 @@ export function Krakow3DMap() {
         onRemoveDestination={handleRemoveDestination}
         onUpdateDestinationMode={handleUpdateDestinationMode}
         onEditDestination={handleOpenEditDestination}
+        onResetData={handleResetData}
       />
 
 

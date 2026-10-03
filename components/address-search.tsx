@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { SearchIcon, MapPinIcon, XIcon, Loader2Icon } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { cn } from 'cn';
 
 export interface SearchResultItem {
   id: string;
@@ -41,14 +40,12 @@ export function AddressSearch({ onSelectLocation, className = '' }: AddressSearc
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        if (!query.trim()) {
-          setIsExpanded(false);
-        }
+        setIsExpanded(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [query]);
+  }, []);
 
   // Wyszukiwanie debounced przez Photon API
   useEffect(() => {
@@ -131,6 +128,7 @@ export function AddressSearch({ onSelectLocation, className = '' }: AddressSearc
   const handleSelect = (item: SearchResultItem) => {
     setQuery(item.name || item.address);
     setIsOpen(false);
+    setIsExpanded(false);
     onSelectLocation(item);
   };
 
@@ -143,53 +141,75 @@ export function AddressSearch({ onSelectLocation, className = '' }: AddressSearc
 
   return (
     <div ref={containerRef} className={`relative select-none font-sans ${className}`}>
-      {!isExpanded ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsExpanded(true)}
-          className="size-7 p-0 hover:border-primary/50 text-muted-foreground hover:text-foreground"
+      {/* PŁYNNIE ROZWIJANY W PRAWO KONTENER WYSZUKIWARKI */}
+      <div
+        className={cn(
+          'flex items-center h-7 rounded-lg border transition-[width,background-color,border-color,box-shadow] duration-300 ease-out overflow-hidden',
+          isExpanded
+            ? 'w-56 sm:w-64 bg-background/95 border-border/80 shadow-inner ring-1 ring-primary/20'
+            : 'w-7 bg-background border-border/80 hover:bg-muted hover:text-foreground cursor-pointer shadow-xs'
+        )}
+        onClick={() => {
+          if (!isExpanded) setIsExpanded(true);
+        }}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            if (!isExpanded) {
+              setIsExpanded(true);
+            } else {
+              inputRef.current?.focus();
+            }
+          }}
+          className="size-7 flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           title="Szukaj adresu w Krakowie"
           aria-label="Szukaj adresu w Krakowie"
         >
-          <SearchIcon className="size-3.5 text-primary" />
-        </Button>
-      ) : (
-        <div className="relative flex items-center animate-in fade-in zoom-in-95 duration-200">
-          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-            {isLoading ? (
-              <Loader2Icon className="size-3.5 animate-spin text-primary" />
-            ) : (
-              <SearchIcon className="size-3.5 text-primary" />
-            )}
-          </div>
+          {isLoading ? (
+            <Loader2Icon className="size-3.5 animate-spin text-primary" />
+          ) : (
+            <SearchIcon className="size-3.5 text-primary" />
+          )}
+        </button>
 
-          <Input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => {
-              if (results.length > 0) setIsOpen(true);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                handleCollapse();
-              }
-            }}
-            placeholder="Szukaj ulicy..."
-            className="h-7 w-48 sm:w-60 pl-7 pr-6 text-xs bg-background/95 border-border/80 rounded-lg font-medium shadow-inner"
-          />
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => {
+            if (results.length > 0) setIsOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              handleCollapse();
+            } else if (e.key === 'Enter' && results.length > 0) {
+              handleSelect(results[0]);
+            }
+          }}
+          placeholder={isExpanded ? 'Szukaj ulicy...' : ''}
+          tabIndex={isExpanded ? 0 : -1}
+          className={cn(
+            'h-full min-w-0 flex-1 bg-transparent border-none outline-none text-xs font-medium text-foreground placeholder:text-muted-foreground transition-opacity duration-200',
+            isExpanded ? 'opacity-100 pr-1' : 'opacity-0 pointer-events-none w-0 p-0'
+          )}
+        />
 
+        {isExpanded && (
           <button
             type="button"
-            onClick={handleCollapse}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCollapse();
+            }}
+            className="size-6 mr-1 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 rounded hover:bg-muted/60 transition-colors cursor-pointer"
             title="Zamknij wyszukiwarkę"
+            aria-label="Zamknij wyszukiwarkę"
           >
             <XIcon className="size-3" />
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ROZWIJANA LISTA WYNIKÓW */}
       {isExpanded && isOpen && results.length > 0 && (

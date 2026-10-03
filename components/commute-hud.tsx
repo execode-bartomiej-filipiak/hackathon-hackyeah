@@ -28,6 +28,7 @@ import {
   HomeIcon,
   LeafIcon,
   ExternalLinkIcon,
+  RotateCcwIcon,
 } from 'lucide-react';
 import { AnalyticsDetailsDialog } from '@/components/analytics-details-dialog';
 
@@ -80,6 +81,7 @@ interface CommuteHudProps {
   onRemoveDestination?: (destinationId: string) => void;
   onUpdateDestinationMode?: (destinationId: string, mode: TravelMode) => void;
   onEditDestination?: (destination: CommuteDestination) => void;
+  onResetData?: () => void;
 }
 
 export function CommuteHud({
@@ -105,6 +107,7 @@ export function CommuteHud({
   onRemoveDestination,
   onUpdateDestinationMode,
   onEditDestination,
+  onResetData,
 }: CommuteHudProps) {
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
@@ -123,11 +126,25 @@ export function CommuteHud({
       <Card className="border border-border/80 bg-background/90 backdrop-blur-md shadow-2xl rounded-2xl overflow-hidden p-0">
         <CardContent className="p-4 space-y-3.5">
           {/* NAGŁÓWEK */}
-          <div className="flex items-center gap-2">
-            <span className="flex size-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Analiza Dojazdów 3D
-            </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex size-2 rounded-full bg-primary animate-pulse" />
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Analiza Dojazdów 3D
+              </span>
+            </div>
+            {onResetData && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onResetData}
+                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1 font-medium hover:bg-muted/80 cursor-pointer"
+                title="Zresetuj dane analizy i widok mapy"
+              >
+                <RotateCcwIcon className="size-3" />
+                <span>Reset</span>
+              </Button>
+            )}
           </div>
 
           {/* JEŚLI BRAK WYBRANEGO BUDYNKU / PRZED PEŁNĄ ANALIZĄ */}

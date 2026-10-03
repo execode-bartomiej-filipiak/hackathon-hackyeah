@@ -5,6 +5,7 @@ Pola do skopiowania do formularza na platformie:
 ---
 
 ### Project Name
+
 ```text
 CommuteScore 3D
 ```
@@ -12,6 +13,7 @@ CommuteScore 3D
 ---
 
 ### Problem
+
 ```text
 Wybierając mieszkanie lub biuro, patrzymy na cenę za m² i zdjęcia, ignorując realny czas dojazdów. W Krakowie kierowcy tracą średnio ponad 120 godzin rocznie w zatorach (TomTom Traffic Index). Tradycyjne mapy 2D nie pozwalają szybko ocenić dojazdu z jednego adresu do kilku prywatnych celów jednocześnie (praca, szkoła dzieci, rodzina, siłownia).
 ```
@@ -19,12 +21,13 @@ Wybierając mieszkanie lub biuro, patrzymy na cenę za m² i zdjęcia, ignorują
 ---
 
 ### Solution
+
 ```text
 Interaktywna mapa 3D Krakowa wyliczająca tygodniowy bilans czasu dojazdów z dowolnego wskazanego budynku do spersonalizowanych celów użytkownika.
 
 Kluczowe funkcje:
 - Routing i estymacja czasów dla 4 środków transportu: MPK (tramwaj/autobus), samochód, rower, pieszo.
-- Wskaźnik CommuteScore (0-100) oraz bilans zaoszczędzonych godzin w skali tygodnia i roku.
+- Wskaźnik (0-100) oraz bilans zaoszczędzonych godzin w skali tygodnia i roku.
 - Dynamiczne, animowane trajektorie 3D łączące budynek z celami.
 - Wskazywanie celów celownikiem na mapie 3D z automatycznym odczytem adresu (ulica i numer).
 - Wyszukiwarka krakowskich adresów z płynnym przelotem kamery.
@@ -33,6 +36,7 @@ Kluczowe funkcje:
 ---
 
 ### Challenges
+
 ```text
 OPEN TASK: SMART CITY
 ```
@@ -40,6 +44,7 @@ OPEN TASK: SMART CITY
 ---
 
 ### Idea stage
+
 ```text
 Work on progress project
 ```
@@ -47,6 +52,7 @@ Work on progress project
 ---
 
 ### What's done so far and goal of your project
+
 ```text
 Przed hackathonem:
 Czysty szablon Next.js 16 + Supabase.
@@ -65,6 +71,7 @@ Zrealizowano w trakcie hackathonu (100% funkcji):
 ---
 
 ### Team status
+
 ```text
 Full team
 ```
@@ -72,6 +79,7 @@ Full team
 ---
 
 ### Current team size
+
 ```text
 2
 ```
@@ -79,11 +87,13 @@ Full team
 ---
 
 ### Needed skills
+
 *(zostaw puste / brak)*
 
 ---
 
 ### Skills comment
+
 ```text
 N/A — 2-osobowy zespół zrealizował projekt w całości.
 ```
@@ -91,6 +101,7 @@ N/A — 2-osobowy zespół zrealizował projekt w całości.
 ---
 
 ### Your video presentation (Public or Listed YouTube link)
+
 ```text
 [Wklej link do wideo z YouTube - status: Niepubliczny / Listed]
 ```
@@ -98,6 +109,7 @@ N/A — 2-osobowy zespół zrealizował projekt w całości.
 ---
 
 ### Website (https://...)
+
 ```text
 https://hackathon-hackyeah.vercel.app
 ```
@@ -105,6 +117,7 @@ https://hackathon-hackyeah.vercel.app
 ---
 
 ### Code Repository
+
 ```text
 https://github.com/execode-bartomiej-filipiak/hackathon-hackyeah
 ```
@@ -112,6 +125,7 @@ https://github.com/execode-bartomiej-filipiak/hackathon-hackyeah
 ---
 
 ### Instructions on how to open project
+
 ```markdown
 1. Wersja online (bez instalacji):
 https://hackathon-hackyeah.vercel.app (działa od razu w przeglądarce, zero logowania).
