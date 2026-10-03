@@ -301,6 +301,7 @@ export function Krakow3DMap() {
   }, [isAddingTarget, isSelectingHome, isSelectingReference]);
 
   const handleUpdateDestinationMode = (destinationId: string, mode: TravelMode) => {
+    cachedAnalysisRef.current = {};
     setCustomDestinations((prev) =>
       prev.map((d) => (d.id === destinationId ? { ...d, travelMode: mode } : d))
     );
@@ -1406,6 +1407,7 @@ export function Krakow3DMap() {
   };
   // Usuwanie zdefiniowanego celu
   const handleRemoveDestination = (destinationId: string) => {
+    cachedAnalysisRef.current = {};
     setCustomDestinations((prev) => prev.filter((d) => d.id !== destinationId));
     setProfiles((prev) =>
       prev.map((p) =>
@@ -1435,6 +1437,8 @@ export function Krakow3DMap() {
     travelMode: TravelMode;
     coordinates: [number, number];
   }) => {
+    cachedAnalysisRef.current = {};
+
     if (data.id) {
       // Aktualizacja istniejącego celu
       setCustomDestinations((prev) =>
@@ -1488,8 +1492,6 @@ export function Krakow3DMap() {
     }
 
     setIsAddDialogOpen(false);
-    setPendingDestination(null);
-    setEditingDestination(null);
   };
 
 
@@ -1657,35 +1659,36 @@ export function Krakow3DMap() {
       </div>
 
       {/* MODAL DEFINIOWANIA LUB EDYCJI CELU */}
-      {(pendingDestination || editingDestination) && (
-        <AddDestinationDialog
-          open={isAddDialogOpen}
-          onOpenChange={(open) => {
-            setIsAddDialogOpen(open);
-            if (!open) {
-              setPendingDestination(null);
-              setEditingDestination(null);
+      <AddDestinationDialog
+        open={isAddDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open);
+          if (!open) {
+            setPendingDestination(null);
+            setEditingDestination(null);
+            if (typeof document !== 'undefined') {
+              document.body.style.pointerEvents = '';
             }
-          }}
-          coordinates={
-            editingDestination
-              ? editingDestination.coordinates
-              : (pendingDestination?.coordinates || null)
           }
-          initialAddress={
-            editingDestination
-              ? editingDestination.name
-              : (pendingDestination?.initialAddress || '')
-          }
-          district={
-            editingDestination
-              ? getDistrict(editingDestination.coordinates[0], editingDestination.coordinates[1])
-              : (pendingDestination?.district || '')
-          }
-          initialDestination={editingDestination}
-          onConfirm={handleConfirmAddDestination}
-        />
-      )}
+        }}
+        coordinates={
+          editingDestination
+            ? editingDestination.coordinates
+            : (pendingDestination?.coordinates || null)
+        }
+        initialAddress={
+          editingDestination
+            ? editingDestination.name
+            : (pendingDestination?.initialAddress || '')
+        }
+        district={
+          editingDestination
+            ? getDistrict(editingDestination.coordinates[0], editingDestination.coordinates[1])
+            : (pendingDestination?.district || '')
+        }
+        initialDestination={editingDestination}
+        onConfirm={handleConfirmAddDestination}
+      />
     </div>
   );
 }
