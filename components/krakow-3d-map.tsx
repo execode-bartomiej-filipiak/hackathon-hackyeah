@@ -231,7 +231,17 @@ export function Krakow3DMap() {
     destinations: currentDestinations,
   };
 
-  const activeOriginBuilding = referenceBuilding || homeBuilding || selectedBuilding;
+  const [activeFocusPoint, setActiveFocusPoint] = useState<'home' | 'reference'>('reference');
+  const activeFocusPointRef = useRef<'home' | 'reference'>('reference');
+  const cachedAnalysisRef = useRef<{
+    home?: CommuteAnalysis;
+    reference?: CommuteAnalysis;
+  }>({});
+
+  const activeOriginBuilding =
+    activeFocusPoint === 'home'
+      ? (homeBuilding || referenceBuilding || selectedBuilding)
+      : (referenceBuilding || homeBuilding || selectedBuilding);
 
   const [isAddingTarget, setIsAddingTarget] = useState(false);
   const isAddingTargetRef = useRef(false);
@@ -240,6 +250,10 @@ export function Krakow3DMap() {
   const [isSelectingReference, setIsSelectingReference] = useState(false);
   const isSelectingReferenceRef = useRef(false);
   const activeProfileIdRef = useRef(activeProfileId);
+
+  useEffect(() => {
+    activeFocusPointRef.current = activeFocusPoint;
+  }, [activeFocusPoint]);
 
   useEffect(() => {
     isAddingTargetRef.current = isAddingTarget;
@@ -670,19 +684,29 @@ export function Krakow3DMap() {
           coordinates: [e.lngLat.lng, e.lngLat.lat],
         };
 
+        cachedAnalysisRef.current = {};
+
         if (isRefMode) {
           setReferenceBuilding(buildingInfo);
           referenceBuildingRef.current = buildingInfo;
+          setActiveFocusPoint('reference');
+          activeFocusPointRef.current = 'reference';
         } else if (isHomeMode) {
           setHomeBuilding(buildingInfo);
           homeBuildingRef.current = buildingInfo;
+          setActiveFocusPoint('home');
+          activeFocusPointRef.current = 'home';
         } else {
           if (!homeBuildingRef.current) {
             setHomeBuilding(buildingInfo);
             homeBuildingRef.current = buildingInfo;
+            setActiveFocusPoint('home');
+            activeFocusPointRef.current = 'home';
           } else {
             setReferenceBuilding(buildingInfo);
             referenceBuildingRef.current = buildingInfo;
+            setActiveFocusPoint('reference');
+            activeFocusPointRef.current = 'reference';
           }
         }
         setSelectedBuilding(buildingInfo);
@@ -834,6 +858,24 @@ export function Krakow3DMap() {
     if (!map || !mapLoaded) return;
 
     if (activeOriginBuilding && currentDestinations.length > 0) {
+      // 0. Sprawdzamy czy mamy już obliczone i zcache'owane dane dla obu punktów
+      if (
+        referenceBuilding &&
+        homeBuilding &&
+        cachedAnalysisRef.current.home &&
+        cachedAnalysisRef.current.reference
+      ) {
+        const target =
+          activeFocusPointRef.current === 'home'
+            ? cachedAnalysisRef.current.home
+            : cachedAnalysisRef.current.reference;
+        setCommuteAnalysis(target);
+        routesRef.current = target.routes;
+        updateTrajectoriesLayer(map, target.routes);
+        updateDestinationMarkers(map, currentDestinations, target.routes);
+        return;
+      }
+
       // 1. Natychmiastowe wstępne wyniki w panelu HUD i markery celów
       let baseAnalysis: CommuteAnalysis;
 
@@ -841,12 +883,18 @@ export function Krakow3DMap() {
         const homeBase = calculateCommuteAnalysis(homeBuilding.coordinates, currentDestinations);
         const refBase = calculateCommuteAnalysis(referenceBuilding.coordinates, currentDestinations);
         refBase.comparisonToHome = calculateRelationalComparison(refBase, homeBase);
-        baseAnalysis = refBase;
+
+        cachedAnalysisRef.current.home = homeBase;
+        cachedAnalysisRef.current.reference = refBase;
+
+        baseAnalysis = activeFocusPointRef.current === 'home' ? homeBase : refBase;
       } else {
         baseAnalysis = calculateCommuteAnalysis(activeOriginBuilding.coordinates, currentDestinations);
+        cachedAnalysisRef.current.home = baseAnalysis;
       }
 
       setCommuteAnalysis(baseAnalysis);
+      routesRef.current = baseAnalysis.routes;
       updateDestinationMarkers(map, currentDestinations, baseAnalysis.routes);
 
       // Czyścimy poprzednie trajektorie, by uniknąć przeskakiwania
@@ -862,9 +910,12 @@ export function Krakow3DMap() {
 
       const fallbackTimer = setTimeout(() => {
         if (isCancelled || !mapRef.current) return;
-        // Aktywujemy bezpieczny fallback na łuki dopiero, gdy OSRM rzeczywiście nie odpowiedział
-        routesRef.current = baseAnalysis.routes;
-        updateTrajectoriesLayer(mapRef.current, baseAnalysis.routes);
+        const targetFallback =
+          activeFocusPointRef.current === 'home' && cachedAnalysisRef.current.home
+            ? cachedAnalysisRef.current.home
+            : baseAnalysis;
+        routesRef.current = targetFallback.routes;
+        updateTrajectoriesLayer(mapRef.current, targetFallback.routes);
       }, 6500);
 
       // 3. Asynchroniczne pobranie prawdziwych tras po ulicach Krakowa (OSRM)
@@ -887,16 +938,26 @@ export function Krakow3DMap() {
             clearTimeout(fallbackTimer);
             if (isCancelled || !mapRef.current) return;
             refReal.comparisonToHome = calculateRelationalComparison(refReal, homeReal);
-            setCommuteAnalysis(refReal);
-            routesRef.current = refReal.routes;
-            updateTrajectoriesLayer(mapRef.current, refReal.routes);
-            updateDestinationMarkers(mapRef.current, currentDestinations, refReal.routes);
+
+            cachedAnalysisRef.current.home = homeReal;
+            cachedAnalysisRef.current.reference = refReal;
+
+            const targetAnalysis =
+              activeFocusPointRef.current === 'home' ? homeReal : refReal;
+            setCommuteAnalysis(targetAnalysis);
+            routesRef.current = targetAnalysis.routes;
+            updateTrajectoriesLayer(mapRef.current, targetAnalysis.routes);
+            updateDestinationMarkers(mapRef.current, currentDestinations, targetAnalysis.routes);
           })
           .catch(() => {
             clearTimeout(fallbackTimer);
             if (isCancelled || !mapRef.current) return;
-            routesRef.current = baseAnalysis.routes;
-            updateTrajectoriesLayer(mapRef.current, baseAnalysis.routes);
+            const targetFallback =
+              activeFocusPointRef.current === 'home' && cachedAnalysisRef.current.home
+                ? cachedAnalysisRef.current.home
+                : baseAnalysis;
+            routesRef.current = targetFallback.routes;
+            updateTrajectoriesLayer(mapRef.current, targetFallback.routes);
           });
       } else {
         fetchEnhancedCommuteAnalysis(
@@ -908,6 +969,7 @@ export function Krakow3DMap() {
           .then((realAnalysis) => {
             clearTimeout(fallbackTimer);
             if (isCancelled || !mapRef.current) return;
+            cachedAnalysisRef.current.home = realAnalysis;
             setCommuteAnalysis(realAnalysis);
             routesRef.current = realAnalysis.routes;
             updateTrajectoriesLayer(mapRef.current, realAnalysis.routes);
@@ -1062,6 +1124,9 @@ export function Krakow3DMap() {
     setSelectedBuilding(null);
     setHomeBuilding(null);
     setReferenceBuilding(null);
+    setActiveFocusPoint('reference');
+    activeFocusPointRef.current = 'reference';
+    cachedAnalysisRef.current = {};
     routesRef.current = [];
     if (popupRef.current) {
       popupRef.current.remove();
@@ -1084,6 +1149,41 @@ export function Krakow3DMap() {
       }
     }
     isSwitchingBuildingRef.current = false;
+  };
+
+  // Przełączanie aktywnego punktu analizy i widoku (miejsce zamieszkania vs miejsce odniesienia)
+  const handleSelectFocusPoint = (point: 'home' | 'reference') => {
+    setActiveFocusPoint(point);
+    activeFocusPointRef.current = point;
+
+    const target = point === 'home' ? homeBuilding : referenceBuilding;
+    if (!target) return;
+
+    setSelectedBuilding(target);
+
+    // 1. Płynne wycentrowanie widoku 3D na wybranym miejscu
+    if (mapRef.current) {
+      mapRef.current.flyTo({
+        center: target.coordinates,
+        zoom: 16.3,
+        pitch: 62,
+        duration: 1400,
+        essential: true,
+      });
+
+      // 2. Natychmiastowa aktywacja zcache'owanych tras i KPI dla wybranego punktu (bez opóźnień)
+      const cached =
+        point === 'home'
+          ? cachedAnalysisRef.current.home
+          : cachedAnalysisRef.current.reference;
+
+      if (cached) {
+        setCommuteAnalysis(cached);
+        routesRef.current = cached.routes;
+        updateTrajectoriesLayer(mapRef.current, cached.routes);
+        updateDestinationMarkers(mapRef.current, currentDestinations, cached.routes);
+      }
+    }
   };
 
   // Fokus na trasie do wybranego celu z panelu HUD
@@ -1153,6 +1253,9 @@ export function Krakow3DMap() {
     homeBuildingRef.current = demoHomeBuilding;
     referenceBuildingRef.current = demoRefBuilding;
     setSelectedBuilding(demoRefBuilding);
+    setActiveFocusPoint('reference');
+    activeFocusPointRef.current = 'reference';
+    cachedAnalysisRef.current = {};
 
     // Podświetlenie w 3D obu demonstracyjnych lokalizacji
     const source = mapRef.current.getSource('selected-building-source');
@@ -1407,6 +1510,8 @@ export function Krakow3DMap() {
         referenceBuildingName={referenceBuilding?.name}
         selectedBuildingName={activeOriginBuilding?.name}
         hasPresetLoaded={hasPresetLoaded}
+        activeFocusPoint={activeFocusPoint}
+        onSelectFocusPoint={handleSelectFocusPoint}
         onFocusDestination={handleFocusDestination}
         onSelectDemoOrigin={handleSelectDemoOrigin}
         isAddingTarget={isAddingTarget}

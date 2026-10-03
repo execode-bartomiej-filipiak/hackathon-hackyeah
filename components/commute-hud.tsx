@@ -64,6 +64,8 @@ interface CommuteHudProps {
   referenceBuildingName?: string;
   selectedBuildingName?: string;
   hasPresetLoaded?: boolean;
+  activeFocusPoint?: 'home' | 'reference';
+  onSelectFocusPoint?: (point: 'home' | 'reference') => void;
   onFocusDestination?: (route: CommuteRouteResult) => void;
   onSelectDemoOrigin?: () => void;
   isAddingTarget?: boolean;
@@ -87,6 +89,8 @@ export function CommuteHud({
   referenceBuildingName,
   selectedBuildingName,
   hasPresetLoaded = false,
+  activeFocusPoint = 'reference',
+  onSelectFocusPoint,
   onFocusDestination,
   onSelectDemoOrigin,
   isAddingTarget = false,
@@ -135,14 +139,29 @@ export function CommuteHud({
                   Miejsce zamieszkania:
                 </span>
                 {effectiveHomeName ? (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-primary/30 bg-primary/5">
+                  <div
+                    onClick={() => onSelectFocusPoint?.('home')}
+                    title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla miejsca zamieszkania"
+                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+                      activeFocusPoint === 'home'
+                        ? 'border-primary ring-2 ring-primary/40 bg-primary/10 shadow-xs'
+                        : 'border-primary/30 bg-primary/5 hover:border-primary/60 hover:bg-primary/10'
+                    }`}
+                  >
                     <div className="flex items-center gap-2 min-w-0 pr-1.5">
                       <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                         <HomeIcon className="size-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[10px] uppercase font-bold text-muted-foreground">
-                          Miejsce zamieszkania
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                            Miejsce zamieszkania
+                          </span>
+                          {activeFocusPoint === 'home' && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[8px] font-bold leading-none">
+                              Aktywne
+                            </span>
+                          )}
                         </div>
                         <div
                           className="text-xs font-semibold text-foreground truncate"
@@ -156,7 +175,10 @@ export function CommuteHud({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={onToggleSelectHome || onToggleSelectOrigin}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          (onToggleSelectHome || onToggleSelectOrigin)?.();
+                        }}
                         className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground shrink-0"
                       >
                         Zmień
@@ -190,14 +212,29 @@ export function CommuteHud({
                   Miejsce odniesienia:
                 </span>
                 {effectiveRefName ? (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-blue-500/30 bg-blue-500/5">
+                  <div
+                    onClick={() => onSelectFocusPoint?.('reference')}
+                    title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla miejsca odniesienia"
+                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+                      activeFocusPoint === 'reference'
+                        ? 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-500/10 shadow-xs'
+                        : 'border-blue-500/30 bg-blue-500/5 hover:border-blue-500/60 hover:bg-blue-500/10'
+                    }`}
+                  >
                     <div className="flex items-center gap-2 min-w-0 pr-1.5">
                       <div className="size-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
                         <Building2Icon className="size-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[10px] uppercase font-bold text-muted-foreground">
-                          Miejsce odniesienia
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                            Miejsce odniesienia
+                          </span>
+                          {activeFocusPoint === 'reference' && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-500 text-[8px] font-bold leading-none">
+                              Aktywne
+                            </span>
+                          )}
                         </div>
                         <div
                           className="text-xs font-semibold text-foreground truncate"
@@ -211,7 +248,10 @@ export function CommuteHud({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={onToggleSelectReference}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleSelectReference();
+                        }}
                         className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground shrink-0"
                       >
                         Zmień
@@ -447,13 +487,28 @@ export function CommuteHud({
               {(effectiveHomeName || effectiveRefName) && (
                 <div className="space-y-1.5 pt-1 border-t border-border/40">
                   {effectiveHomeName && (
-                    <div className="flex items-center justify-between p-2 rounded-xl border border-primary/30 bg-primary/5">
+                    <div
+                      onClick={() => onSelectFocusPoint?.('home')}
+                      title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla miejsca zamieszkania"
+                      className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
+                        activeFocusPoint === 'home'
+                          ? 'border-primary ring-2 ring-primary/40 bg-primary/10 shadow-xs'
+                          : 'border-primary/30 bg-primary/5 hover:border-primary/60 hover:bg-primary/10'
+                      }`}
+                    >
                       <div className="flex items-center gap-2 min-w-0 pr-1.5">
                         <HomeIcon className="size-3.5 text-primary shrink-0" />
                         <div className="min-w-0">
-                          <span className="text-[9px] uppercase font-bold text-muted-foreground block leading-none">
-                            Miejsce zamieszkania
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] uppercase font-bold text-muted-foreground block leading-none">
+                              Miejsce zamieszkania
+                            </span>
+                            {activeFocusPoint === 'home' && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[8px] font-bold leading-none">
+                                Aktywny widok
+                              </span>
+                            )}
+                          </div>
                           <span className="text-xs font-semibold text-foreground truncate block mt-0.5">
                             {effectiveHomeName}
                           </span>
@@ -463,7 +518,10 @@ export function CommuteHud({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={onToggleSelectHome || onClearSelection}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            (onToggleSelectHome || onClearSelection)?.();
+                          }}
                           className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-foreground shrink-0"
                         >
                           Zmień
@@ -473,13 +531,28 @@ export function CommuteHud({
                   )}
 
                   {effectiveRefName && (
-                    <div className="flex items-center justify-between p-2 rounded-xl border border-blue-500/30 bg-blue-500/5">
+                    <div
+                      onClick={() => onSelectFocusPoint?.('reference')}
+                      title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla miejsca odniesienia"
+                      className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
+                        activeFocusPoint === 'reference'
+                          ? 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-500/10 shadow-xs'
+                          : 'border-blue-500/30 bg-blue-500/5 hover:border-blue-500/60 hover:bg-blue-500/10'
+                      }`}
+                    >
                       <div className="flex items-center gap-2 min-w-0 pr-1.5">
                         <Building2Icon className="size-3.5 text-blue-500 shrink-0" />
                         <div className="min-w-0">
-                          <span className="text-[9px] uppercase font-bold text-muted-foreground block leading-none">
-                            Miejsce odniesienia
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] uppercase font-bold text-muted-foreground block leading-none">
+                              Miejsce odniesienia
+                            </span>
+                            {activeFocusPoint === 'reference' && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-500 text-[8px] font-bold leading-none">
+                                Aktywny widok
+                              </span>
+                            )}
+                          </div>
                           <span className="text-xs font-semibold text-foreground truncate block mt-0.5">
                             {effectiveRefName}
                           </span>
@@ -489,7 +562,10 @@ export function CommuteHud({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={onToggleSelectReference}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleSelectReference();
+                          }}
                           className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-foreground shrink-0"
                         >
                           Zmień
