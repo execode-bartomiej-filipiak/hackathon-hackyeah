@@ -12,13 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
-  ClockIcon,
-  LeafIcon,
   TrendingDownIcon,
   TrendingUpIcon,
   SparklesIcon,
   CheckCircle2Icon,
-  WalletIcon,
   InfoIcon,
 } from 'lucide-react';
 import {
@@ -140,63 +137,13 @@ export function AnalyticsDetailsDialog({
     'Odległość drogowa = dystans w linii prostej × 1,28 (krętość siatki ulic Krakowa).',
   ].join('\n');
 
-  // Najistotniejsze dane: oszczędności tygodniowe oraz wartości obu lokalizacji
-  const tiles = [
-    {
-      id: 'cost',
-      label: 'Koszt dojazdów',
-      icon: WalletIcon,
-      unit: 'zł',
-      decimals: 0,
-      tooltip: costTooltip,
-      savedWeekly: hasReference
-        ? comparison?.savedCostWeeklyPln ?? 0
-        : analysis.weeklyCostSavingsVsCarPln,
-      currentWeekly: comparison?.homeWeeklyCostPln ?? 0,
-      nextWeekly: analysis.totalWeeklyCostPln,
-    },
-    {
-      id: 'time',
-      label: 'Czas w drodze',
-      icon: ClockIcon,
-      unit: 'h',
-      decimals: 1,
-      tooltip: timeTooltip,
-      savedWeekly: hasReference
-        ? comparison?.savedHoursPerWeek ?? 0
-        : analysis.weeklySavingsHours,
-      currentWeekly: comparison?.homeHoursPerWeek ?? 0,
-      nextWeekly: analysis.totalHoursPerWeek,
-    },
-    {
-      id: 'co2',
-      label: 'Emisja CO₂',
-      icon: LeafIcon,
-      unit: 'kg CO₂',
-      decimals: 1,
-      tooltip: co2Tooltip,
-      savedWeekly: hasReference ? comparison?.savedCo2Kg ?? 0 : analysis.weeklyCo2SavingsKg,
-      currentWeekly: comparison?.homeCo2Kg ?? 0,
-      nextWeekly: analysis.totalWeeklyCo2Kg,
-    },
-  ];
-
   const formatValue = (value: number, decimals: number) =>
     decimals === 0 ? formatPln(value, 0) : value.toFixed(decimals);
 
-  // Rozbudowane podsumowanie: rozkład dojazdów, skrajne cele i kontekst krakowski
+  // Kontekst decyzyjny: najdłuższy dojazd oraz porównanie z normą krakowską
   const routes = analysis.routes;
-  const optimalCount = routes.filter((route) => route.status === 'optimal').length;
-  const moderateCount = routes.filter((route) => route.status === 'moderate').length;
-  const heavyCount = routes.filter((route) => route.status === 'heavy').length;
-  const avgMinutes = routes.length
-    ? Math.round(routes.reduce((sum, route) => sum + route.durationMinutes, 0) / routes.length)
-    : 0;
   const worstRoute = routes.length
     ? routes.reduce((a, b) => (b.durationMinutes > a.durationMinutes ? b : a))
-    : null;
-  const bestRoute = routes.length
-    ? routes.reduce((a, b) => (b.durationMinutes < a.durationMinutes ? b : a))
     : null;
   const benchmarkDeltaHours = Math.abs(
     Number((KRAKOW_BENCHMARK_HOURS - analysis.totalHoursPerWeek).toFixed(1))
@@ -217,7 +164,7 @@ export function AnalyticsDetailsDialog({
       label: 'NearBy Score',
       unit: 'pkt',
       decimals: 0,
-      scalesWithHorizon: false,
+      weeklyMetric: false,
       lowerIsBetter: false,
       current: homeScore,
       next: analysis.score,
@@ -227,7 +174,8 @@ export function AnalyticsDetailsDialog({
       label: 'Czas w drodze',
       unit: 'h',
       decimals: 1,
-      scalesWithHorizon: true,
+      weeklyMetric: true,
+      tooltip: timeTooltip,
       lowerIsBetter: true,
       current: homeHours,
       next: analysis.totalHoursPerWeek,
@@ -237,7 +185,8 @@ export function AnalyticsDetailsDialog({
       label: 'Koszt dojazdów',
       unit: 'zł',
       decimals: 0,
-      scalesWithHorizon: true,
+      weeklyMetric: true,
+      tooltip: costTooltip,
       lowerIsBetter: true,
       current: homeCost,
       next: analysis.totalWeeklyCostPln,
@@ -247,7 +196,8 @@ export function AnalyticsDetailsDialog({
       label: 'Emisja CO₂',
       unit: 'kg',
       decimals: 1,
-      scalesWithHorizon: true,
+      weeklyMetric: true,
+      tooltip: co2Tooltip,
       lowerIsBetter: true,
       current: homeCo2,
       next: analysis.totalWeeklyCo2Kg,
@@ -316,98 +266,6 @@ export function AnalyticsDetailsDialog({
             </div>
           </div>
 
-          {/* PRZEŁĄCZNIK HORYZONTU OSZCZĘDNOŚCI */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-              Horyzont oszczędności
-            </span>
-            <div
-              role="tablist"
-              aria-label="Horyzont oszczędności"
-              className="inline-flex items-center gap-0.5 p-0.5 rounded-lg border border-border bg-muted/50"
-            >
-              {HORIZONS.map((item) => {
-                const isActive = horizonId === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    onClick={() => setHorizonId(item.id)}
-                    className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
-                      isActive
-                        ? 'bg-background text-foreground shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* KAFELKI Z OSZCZĘDNOŚCIAMI */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {tiles.map((tile) => {
-              const isSaving = tile.savedWeekly >= 0;
-              const Icon = tile.icon;
-              return (
-                <div
-                  key={tile.id}
-                  className="p-3.5 rounded-xl border border-border bg-card space-y-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Icon className="size-3.5 text-primary shrink-0" />
-                      {tile.label}
-                    </span>
-                    <MethodologyHint tooltip={tile.tooltip} />
-                  </div>
-
-                  <div className="flex flex-wrap items-baseline gap-1">
-                    <span
-                      className={`text-2xl font-black tabular-nums ${
-                        isSaving ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
-                      }`}
-                    >
-                      {isSaving ? '−' : '+'}
-                      {formatValue(Math.abs(tile.savedWeekly) * horizon.factor, tile.decimals)}
-                    </span>
-                    <span className="text-xs font-bold text-foreground/80">{tile.unit}</span>
-                    <span className="text-[10px] font-medium text-muted-foreground">
-                      {horizon.suffix}
-                    </span>
-                    {isSaving ? (
-                      <TrendingDownIcon className="size-3.5 text-emerald-500 shrink-0" />
-                    ) : (
-                      <TrendingUpIcon className="size-3.5 text-rose-500 shrink-0" />
-                    )}
-                  </div>
-
-                  {hasReference ? (
-                    <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
-                      <span>
-                        obecne{' '}
-                        {formatValue(tile.currentWeekly * horizon.factor, tile.decimals)}{' '}
-                        {tile.unit}
-                      </span>
-                      <span className="text-border">→</span>
-                      <span className="font-semibold text-foreground/80">
-                        nowe {formatValue(tile.nextWeekly * horizon.factor, tile.decimals)} {tile.unit}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="text-[10px] text-muted-foreground">
-                      oszczędność vs wariant czysto samochodowy
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
           {/* ZESTAWIENIE DECYZYJNE: OBECNE vs NOWE MIEJSCE ZAMIESZKANIA */}
           {hasReference && comparison && (
             <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -415,12 +273,40 @@ export function AnalyticsDetailsDialog({
                 <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
                   Obecne vs nowe miejsce zamieszkania
                 </span>
-                <span className="text-[10px] text-muted-foreground">
-                  Wartości dla: {horizon.label.toLowerCase()}
-                </span>
+                <div
+                  role="tablist"
+                  aria-label="Horyzont oszczędności"
+                  className="inline-flex items-center gap-0.5 p-0.5 rounded-lg border border-border bg-muted/50"
+                >
+                  {HORIZONS.map((item) => {
+                    const isActive = horizonId === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        onClick={() => setHorizonId(item.id)}
+                        className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-md transition-colors cursor-pointer ${
+                          isActive
+                            ? 'bg-background text-foreground shadow-xs'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <table className="w-full text-[11px] tabular-nums">
+              <table className="w-full table-fixed text-[11px] tabular-nums">
+                <colgroup>
+                  <col />
+                  <col className="w-[92px]" />
+                  <col className="w-[92px]" />
+                  <col className="w-[104px]" />
+                </colgroup>
                 <thead>
                   <tr className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground">
                     <th className="text-left font-bold px-3.5 py-1.5">Wskaźnik</th>
@@ -431,17 +317,19 @@ export function AnalyticsDetailsDialog({
                 </thead>
                 <tbody className="divide-y divide-border/60">
                   {comparisonRows.map((row) => {
-                    const factor = row.scalesWithHorizon ? horizon.factor : 1;
-                    const suffix = row.scalesWithHorizon ? horizon.suffix : '';
+                    const factor = row.weeklyMetric ? horizon.factor : 1;
                     const deltaScaled = (row.next - row.current) * factor;
                     const improves = row.lowerIsBetter ? deltaScaled <= 0 : deltaScaled >= 0;
                     return (
                       <tr key={row.id}>
                         <td className="px-3.5 py-2 text-muted-foreground">
-                          {row.label}
-                          {suffix && (
-                            <span className="text-muted-foreground/70"> {suffix}</span>
-                          )}
+                          <div>
+                            {row.label}
+                            {row.weeklyMetric && (
+                              <span className="text-muted-foreground/70"> {horizon.suffix}</span>
+                            )}
+                          </div>
+                          {row.tooltip && <MethodologyHint tooltip={row.tooltip} />}
                         </td>
                         <td className="px-2 py-2 text-right text-muted-foreground">
                           {formatValue(row.current * factor, row.decimals)} {row.unit}
@@ -473,76 +361,6 @@ export function AnalyticsDetailsDialog({
               </table>
             </div>
           )}
-
-          {/* SZYBKIE WSKAŹNIKI DOJAZDÓW */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { label: 'Cele do 15 min', value: `${optimalCount} z ${routes.length}` },
-              { label: 'Średni dojazd', value: `${avgMinutes} min` },
-              {
-                label: 'Najbliższy cel',
-                value: bestRoute ? `${bestRoute.durationMinutes} min` : '—',
-                hint: bestRoute?.destinationName,
-              },
-              {
-                label: 'Najdalszy cel',
-                value: worstRoute ? `${worstRoute.durationMinutes} min` : '—',
-                hint: worstRoute?.destinationName,
-              },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="p-2.5 rounded-lg border border-border bg-muted/30"
-                title={item.hint}
-              >
-                <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground">
-                  {item.label}
-                </div>
-                <div className="text-sm font-bold text-foreground tabular-nums mt-0.5">
-                  {item.value}
-                </div>
-                {item.hint && (
-                  <div className="text-[9px] text-muted-foreground truncate mt-0.5">{item.hint}</div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* MIASTO 15-MINUTOWE — ROZKŁAD CELÓW */}
-          <div className="p-3.5 rounded-xl border border-border bg-card space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                Rozkład dojazdów do celów
-              </span>
-              <span className="text-[10px] text-muted-foreground">
-                {optimalCount} / {routes.length} w standardzie 15 minut
-              </span>
-            </div>
-            <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-              {[
-                { count: optimalCount, className: 'bg-emerald-500' },
-                { count: moderateCount, className: 'bg-amber-500' },
-                { count: heavyCount, className: 'bg-rose-500' },
-              ].map((segment, index) => (
-                <div
-                  key={index}
-                  className={segment.className}
-                  style={{ width: `${routes.length ? (segment.count / routes.length) * 100 : 0}%` }}
-                />
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-emerald-500" /> do 15 min ({optimalCount})
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-amber-500" /> 15–28 min ({moderateCount})
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-rose-500" /> powyżej 28 min ({heavyCount})
-              </span>
-            </div>
-          </div>
 
           {/* WNIOSKI */}
           <div className="p-3.5 rounded-xl border border-border bg-card space-y-2">
