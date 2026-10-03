@@ -20,6 +20,7 @@ import {
   FootprintsIcon,
   MapPinIcon,
   TargetIcon,
+  PencilIcon,
 } from 'lucide-react';
 
 interface AddDestinationDialogProps {
@@ -28,7 +29,9 @@ interface AddDestinationDialogProps {
   coordinates: [number, number] | null;
   initialAddress: string;
   district: string;
+  initialDestination?: CommuteDestination | null;
   onConfirm: (destination: {
+    id?: string;
     name: string;
     category: CommuteDestination['category'];
     icon: string;
@@ -75,8 +78,11 @@ export function AddDestinationDialog({
   coordinates,
   initialAddress,
   district,
+  initialDestination,
   onConfirm,
 }: AddDestinationDialogProps) {
+  const isEdit = Boolean(initialDestination);
+
   const [name, setName] = useState('');
   const [category, setCategory] = useState<CommuteDestination['category']>('work');
   const [icon, setIcon] = useState('🏢');
@@ -85,13 +91,21 @@ export function AddDestinationDialog({
 
   useEffect(() => {
     if (open) {
-      setName(initialAddress || 'Nowy cel podróży');
-      setCategory('work');
-      setIcon('🏢');
-      setFrequency(3);
-      setTravelMode('transit');
+      if (initialDestination) {
+        setName(initialDestination.name);
+        setCategory(initialDestination.category);
+        setIcon(initialDestination.icon);
+        setFrequency(initialDestination.frequencyPerWeek);
+        setTravelMode(initialDestination.travelMode);
+      } else {
+        setName(initialAddress || 'Nowy cel podróży');
+        setCategory('work');
+        setIcon('🏢');
+        setFrequency(3);
+        setTravelMode('transit');
+      }
     }
-  }, [open, initialAddress]);
+  }, [open, initialAddress, initialDestination]);
 
   const handleSelectCategory = (cat: (typeof CATEGORY_OPTIONS)[0]) => {
     setCategory(cat.category);
@@ -99,14 +113,17 @@ export function AddDestinationDialog({
   };
 
   const handleSave = () => {
-    if (!coordinates) return;
+    const finalCoords = initialDestination?.coordinates || coordinates;
+    if (!finalCoords) return;
+
     onConfirm({
-      name: name.trim() || initialAddress || 'Nowy cel',
+      id: initialDestination?.id,
+      name: name.trim() || initialAddress || 'Punkt docelowy',
       category,
       icon,
       frequencyPerWeek: frequency,
       travelMode,
-      coordinates,
+      coordinates: finalCoords,
     });
     onOpenChange(false);
   };
@@ -116,15 +133,17 @@ export function AddDestinationDialog({
       <DialogContent className="sm:max-w-md border-border/80 bg-background/95 backdrop-blur-md shadow-2xl rounded-2xl p-5 space-y-4">
         <DialogHeader className="space-y-1">
           <div className="flex items-center gap-2 text-primary font-semibold text-xs">
-            <TargetIcon className="size-4" />
-            <span>Nowy Cel Podróży</span>
+            {isEdit ? <PencilIcon className="size-4" /> : <TargetIcon className="size-4" />}
+            <span>{isEdit ? 'Edycja Celu Podróży' : 'Nowy Cel Podróży'}</span>
           </div>
           <DialogTitle className="text-base font-bold text-foreground">
-            Zdefiniuj cel na mapie
+            {isEdit ? 'Zmień parametry celu' : 'Zdefiniuj cel na mapie'}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground flex items-center gap-1.5 pt-0.5">
             <MapPinIcon className="size-3 text-primary shrink-0" />
-            <span className="truncate">Lokalizacja: {initialAddress} ({district})</span>
+            <span className="truncate">
+              Lokalizacja: {initialAddress || initialDestination?.name} ({district})
+            </span>
           </DialogDescription>
         </DialogHeader>
 
@@ -241,7 +260,7 @@ export function AddDestinationDialog({
             onClick={handleSave}
             className="text-xs h-8 font-medium gap-1.5"
           >
-            <span>Zatwierdź cel</span>
+            <span>{isEdit ? 'Zapisz zmiany' : 'Zatwierdź cel'}</span>
           </Button>
         </DialogFooter>
       </DialogContent>
