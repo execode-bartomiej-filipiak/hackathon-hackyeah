@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import type {
   Map,
-  Popup,
   GeoJSONSource,
   MapGeoJSONFeature,
   MapLayerMouseEvent,
@@ -201,7 +200,7 @@ function extractClickedPolygon(
 export function Krakow3DMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
-  const popupRef = useRef<Popup | null>(null);
+  const selectedMarkerRef = useRef<maplibregl.Marker | null>(null);
   const isSwitchingBuildingRef = useRef(false);
   const isRotatingRef = useRef(false);
   const destinationMarkersRef = useRef<maplibregl.Marker[]>([]);
@@ -714,135 +713,43 @@ export function Krakow3DMap() {
         }
         setSelectedBuilding(buildingInfo);
 
-        // Podświetlenie geometrii budynku lub punktu w 3D
-        const source = mapInstance.getSource('selected-building-source');
-        if (source && source.type === 'geojson') {
-          const geoSource = source as GeoJSONSource;
-          if (buildingFeature && buildingFeature.geometry) {
-            geoSource.setData({
-              type: 'FeatureCollection',
-              features: [
-                {
-                  type: 'Feature',
-                  properties: {
-                    render_height: height + 0.5,
-                    height: height + 0.5,
-                    render_min_height: 0,
-                    min_height: 0,
-                  },
-                  geometry: extractClickedPolygon(buildingFeature.geometry, [
-                    e.lngLat.lng,
-                    e.lngLat.lat,
-                  ]),
-                },
-              ],
-            });
-          } else {
-            const d = 0.00015;
-            const lng = e.lngLat.lng;
-            const lat = e.lngLat.lat;
-            geoSource.setData({
-              type: 'FeatureCollection',
-              features: [
-                {
-                  type: 'Feature',
-                  properties: {
-                    render_height: 18,
-                    height: 18,
-                    render_min_height: 0,
-                    min_height: 0,
-                  },
-                  geometry: {
-                    type: 'Polygon',
-                    coordinates: [
-                      [
-                        [lng - d, lat - d],
-                        [lng + d, lat - d],
-                        [lng + d, lat + d],
-                        [lng - d, lat + d],
-                        [lng - d, lat - d],
-                      ],
-                    ],
-                  },
-                },
-              ],
-            });
+        const currentPointType: 'home' | 'reference' =
+          isHomeMode || (!isRefMode && !homeBuildingRef.current) ? 'home' : 'reference';
+
+        // Wyświetlenie efektownego wskaźnika przestrzennego 3D oraz podświetlenia bryły
+        showBuildingHighlightAndIndicator(mapInstance, buildingInfo, currentPointType);
+
+        // Wyszukiwanie rzeczywistej nazwy ulicy i numeru budynku przez reverse-geocoding
+        const currentLng = e.lngLat.lng;
+        const currentLat = e.lngLat.lat;
+
+        reverseGeocodeKrakow(currentLng, currentLat).then((resolved) => {
+          if (selectedMarkerRef.current) {
+            const el = selectedMarkerRef.current.getElement();
+            const titleEl = el.querySelector('.indicator-address-title');
+            const districtEl = el.querySelector('.indicator-district-text');
+            if (titleEl) titleEl.textContent = resolved.address;
+            if (districtEl) districtEl.textContent = resolved.district;
           }
-        }
 
-        // Tooltip 3D na mapie - bezpieczne usunięcie poprzedniego dymka bez resetu stanu
-        if (popupRef.current) {
-          isSwitchingBuildingRef.current = true;
-          popupRef.current.remove();
-          popupRef.current = null;
-          isSwitchingBuildingRef.current = false;
-        }
-
-        const labelMode = isRefMode
-          ? '🏢 Miejsce odniesienia'
-          : isHomeMode
-          ? '🏠 Miejsce zamieszkania'
-          : '📍 Wybrana lokalizacja';
-
-        const popupElement = document.createElement('div');
-        popupElement.className = 'p-1 text-slate-900 font-sans';
-        popupElement.innerHTML = `
-          <div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: #475569; margin-bottom: 2px;">
-            ${labelMode}
-          </div>
-          <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;" class="building-address-title">${initialTitle}</div>
-          <div style="font-size: 11px; color: #475569;">
-            Dzielnica: <strong style="color: #0f172a;" class="building-district-text">${initialDistrict}</strong>
-          </div>
-        `;
-
-          const newPopup = new maplibregl.Popup({
-            offset: [0, -12],
-            closeButton: true,
-            closeOnClick: false,
-            className: 'krakow-map-popup',
-          })
-            .setLngLat(e.lngLat)
-            .setDOMContent(popupElement)
-            .addTo(mapInstance);
-
-          newPopup.on('close', () => {
-            if (isSwitchingBuildingRef.current) return;
-            handleClearSelection();
-          });
-
-          popupRef.current = newPopup;
-
-          // Wyszukiwanie rzeczywistej nazwy ulicy i numeru budynku
-          const currentLng = e.lngLat.lng;
-          const currentLat = e.lngLat.lat;
-
-          reverseGeocodeKrakow(currentLng, currentLat).then((resolved) => {
-            if (popupRef.current) {
-              const titleEl = popupElement.querySelector('.building-address-title');
-              const districtEl = popupElement.querySelector('.building-district-text');
-              if (titleEl) titleEl.textContent = resolved.address;
-              if (districtEl) districtEl.textContent = resolved.district;
+          const updateResolved = (prev: SelectedBuildingInfo | null) => {
+            if (!prev) return null;
+            if (prev.coordinates[0] === currentLng && prev.coordinates[1] === currentLat) {
+              return {
+                ...prev,
+                name: resolved.address,
+                district: resolved.district,
+              };
             }
+            return prev;
+          };
 
-            const updateResolved = (prev: SelectedBuildingInfo | null) => {
-              if (!prev) return null;
-              if (prev.coordinates[0] === currentLng && prev.coordinates[1] === currentLat) {
-                return {
-                  ...prev,
-                  name: resolved.address,
-                  district: resolved.district,
-                };
-              }
-              return prev;
-            };
+          setSelectedBuilding(updateResolved);
+          setHomeBuilding(updateResolved);
+          setReferenceBuilding(updateResolved);
+        });
 
-            setSelectedBuilding(updateResolved);
-            setHomeBuilding(updateResolved);
-            setReferenceBuilding(updateResolved);
-          });
       });
-
     });
 
     mapRef.current = mapInstance;
@@ -1134,9 +1041,9 @@ export function Krakow3DMap() {
     activeFocusPointRef.current = 'reference';
     cachedAnalysisRef.current = {};
     routesRef.current = [];
-    if (popupRef.current) {
-      popupRef.current.remove();
-      popupRef.current = null;
+    if (selectedMarkerRef.current) {
+      selectedMarkerRef.current.remove();
+      selectedMarkerRef.current = null;
     }
     if (mapRef.current) {
       updateTrajectoriesLayer(mapRef.current, []);
@@ -1187,9 +1094,9 @@ export function Krakow3DMap() {
 
     // 4. Reset obrotu i popupów
     setIsRotating(false);
-    if (popupRef.current) {
-      popupRef.current.remove();
-      popupRef.current = null;
+    if (selectedMarkerRef.current) {
+      selectedMarkerRef.current.remove();
+      selectedMarkerRef.current = null;
     }
 
     // 5. Wyczyszczenie warstw graficznych na mapie 3D
@@ -1223,53 +1130,104 @@ export function Krakow3DMap() {
 
 
   // Wyświetlenie podświetlenia budynku 3D oraz dymka informacyjnego
-  const showBuildingHighlightAndTooltip = (
+  // Wyświetlenie podświetlenia budynku 3D oraz efektownego wskaźnika przestrzennego (3D Spatial Beacon)
+  const showBuildingHighlightAndIndicator = (
     map: Map,
     building: SelectedBuildingInfo,
     pointType: 'home' | 'reference'
   ) => {
-    // 1. Bezpieczne usunięcie poprzedniego dymka
-    if (popupRef.current) {
+    // 1. Bezpieczne usunięcie poprzedniego wskaźnika
+    if (selectedMarkerRef.current) {
       isSwitchingBuildingRef.current = true;
-      popupRef.current.remove();
-      popupRef.current = null;
+      selectedMarkerRef.current.remove();
+      selectedMarkerRef.current = null;
       isSwitchingBuildingRef.current = false;
     }
 
-    // 2. Utworzenie nowego dymka 3D
-    const labelMode = pointType === 'home' ? '🏠 Miejsce zamieszkania' : '🏢 Miejsce odniesienia';
-    const popupElement = document.createElement('div');
-    popupElement.className = 'p-1 text-slate-900 font-sans';
-    popupElement.innerHTML = `
-      <div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: #475569; margin-bottom: 2px;">
-        ${labelMode}
+    // 2. Utworzenie efektownego wskaźnika przestrzennego 3D (Spatial HUD Beacon)
+    const isHome = pointType === 'home';
+    const highlightColor = isHome ? '#f59e0b' : '#3b82f6';
+    const badgeBorder = isHome
+      ? 'border-amber-400/60 shadow-[0_0_24px_rgba(245,158,11,0.45)]'
+      : 'border-blue-400/60 shadow-[0_0_24px_rgba(59,130,246,0.45)]';
+    const iconBg = isHome
+      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+      : 'bg-blue-500/20 text-blue-400 border border-blue-500/40';
+    const dotBg = isHome ? 'bg-amber-400' : 'bg-blue-400';
+    const subColor = isHome ? 'text-amber-400' : 'text-blue-400';
+    const pointerBorder = isHome ? 'border-t-amber-500/80' : 'border-t-blue-500/80';
+    const stemGradient = isHome
+      ? 'bg-gradient-to-b from-amber-400 to-amber-500/20 shadow-[0_0_8px_#f59e0b]'
+      : 'bg-gradient-to-b from-blue-400 to-blue-500/20 shadow-[0_0_8px_#3b82f6]';
+    const beaconPing = isHome ? 'border-amber-400 bg-amber-400/30' : 'border-blue-400 bg-blue-400/30';
+    const beaconCore = isHome ? 'bg-amber-400 shadow-[0_0_12px_#f59e0b]' : 'bg-blue-400 shadow-[0_0_12px_#3b82f6]';
+    const typeLabel = isHome ? 'Miejsce zamieszkania' : 'Miejsce odniesienia';
+    const typeEmoji = isHome ? '🏠' : '🏢';
+
+    const indicatorEl = document.createElement('div');
+    indicatorEl.className = 'krakow-3d-spatial-indicator group select-none pointer-events-auto cursor-pointer flex flex-col items-center';
+    indicatorEl.innerHTML = `
+      <div class="relative flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-slate-950/90 backdrop-blur-xl ${badgeBorder} border transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1">
+        <div class="size-7 sm:size-8 rounded-xl flex items-center justify-center shrink-0 ${iconBg} text-base">
+          ${typeEmoji}
+        </div>
+        <div class="min-w-0 flex-1 pr-1">
+          <div class="flex items-center gap-1.5">
+            <span class="size-1.5 rounded-full ${dotBg} animate-pulse"></span>
+            <span class="text-[9px] uppercase font-bold tracking-wider ${subColor}">
+              ${typeLabel}
+            </span>
+          </div>
+          <div class="text-xs font-bold text-white truncate max-w-[170px] sm:max-w-[220px] indicator-address-title leading-tight mt-0.5">
+            ${building.name}
+          </div>
+          <div class="text-[10px] text-slate-400 truncate indicator-district-text">
+            ${building.district}
+          </div>
+        </div>
+        <button type="button" class="indicator-close-btn p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0" title="Wyczyść zaznaczenie">
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+          </svg>
+        </button>
       </div>
-      <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">${building.name}</div>
-      <div style="font-size: 11px; color: #475569;">
-        Dzielnica: <strong style="color: #0f172a;">${building.district}</strong>
+      <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[7px] ${pointerBorder} -mt-[1px]"></div>
+      <div class="w-0.5 h-6 ${stemGradient}"></div>
+      <div class="relative flex items-center justify-center size-5 -mt-2.5">
+        <div class="absolute size-5 rounded-full border-2 ${beaconPing} animate-ping"></div>
+        <div class="size-2.5 rounded-full ${beaconCore}"></div>
       </div>
     `;
 
-    const newPopup = new maplibregl.Popup({
-      offset: [0, -12],
-      closeButton: true,
-      closeOnClick: false,
-      className: 'krakow-map-popup',
+    const closeBtn = indicatorEl.querySelector('.indicator-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleClearSelection();
+      });
+    }
+
+    indicatorEl.onclick = (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.indicator-close-btn')) return;
+      map.flyTo({
+        center: building.coordinates,
+        zoom: 16.5,
+        pitch: 62,
+        duration: 1200,
+        essential: true,
+      });
+    };
+
+    const marker = new maplibregl.Marker({
+      element: indicatorEl,
+      anchor: 'bottom',
     })
       .setLngLat(building.coordinates)
-      .setDOMContent(popupElement)
       .addTo(map);
 
-    newPopup.on('close', () => {
-      if (isSwitchingBuildingRef.current) return;
-      popupRef.current = null;
-    });
-
-    popupRef.current = newPopup;
-
+    selectedMarkerRef.current = marker;
     // 3. Podświetlenie bryły budynku 3D z odpowiednim kolorem
-    const highlightColor = pointType === 'home' ? '#f59e0b' : '#3b82f6';
-
     const updateGeometry = () => {
       if (!mapRef.current) return;
       const screenPoint = mapRef.current.project(building.coordinates);
@@ -1367,7 +1325,7 @@ export function Krakow3DMap() {
 
     // 1. Podświetlenie budynku i pokazanie dymka / tooltipa
     if (mapRef.current) {
-      showBuildingHighlightAndTooltip(mapRef.current, target, point);
+      showBuildingHighlightAndIndicator(mapRef.current, target, point);
 
       // 2. Płynne wycentrowanie widoku 3D na wybranym miejscu
       mapRef.current.flyTo({
@@ -1428,10 +1386,10 @@ export function Krakow3DMap() {
 
     setHasPresetLoaded(true);
 
-    if (popupRef.current) {
+    if (selectedMarkerRef.current) {
       isSwitchingBuildingRef.current = true;
-      popupRef.current.remove();
-      popupRef.current = null;
+      selectedMarkerRef.current.remove();
+      selectedMarkerRef.current = null;
       isSwitchingBuildingRef.current = false;
     }
 
@@ -1464,7 +1422,7 @@ export function Krakow3DMap() {
     activeFocusPointRef.current = 'reference';
     cachedAnalysisRef.current = {};
 
-    showBuildingHighlightAndTooltip(mapRef.current, demoRefBuilding, 'reference');
+    showBuildingHighlightAndIndicator(mapRef.current, demoRefBuilding, 'reference');
 
     mapRef.current.flyTo({
       center: demoRefCoords,
@@ -1578,41 +1536,35 @@ export function Krakow3DMap() {
       duration: 1800,
     });
 
+    const pointType = isSelectingHome ? 'home' : 'reference';
     const buildingInfo: SelectedBuildingInfo = {
       name: item.name || item.address,
+      type: 'Adres z wyszukiwarki',
+      height: 22,
+      levels: 5,
       district: item.district,
       coordinates: item.coordinates,
     };
-    setSelectedBuilding(buildingInfo);
 
-    if (popupRef.current) {
-      popupRef.current.remove();
+    if (isSelectingHome) {
+      setHomeBuilding(buildingInfo);
+      homeBuildingRef.current = buildingInfo;
+      setActiveFocusPoint('home');
+      activeFocusPointRef.current = 'home';
+      setIsSelectingHome(false);
+      isSelectingHomeRef.current = false;
+    } else {
+      setReferenceBuilding(buildingInfo);
+      referenceBuildingRef.current = buildingInfo;
+      setActiveFocusPoint('reference');
+      activeFocusPointRef.current = 'reference';
+      setIsSelectingReference(false);
+      isSelectingReferenceRef.current = false;
     }
 
-    const popupElement = document.createElement('div');
-    popupElement.className = 'p-1 text-slate-900 font-sans';
-    popupElement.innerHTML = `
-      <div style="font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
-        <span>📍</span> <span class="building-address-title">${item.address || item.name}</span>
-      </div>
-      <div style="font-size: 11px; color: #475569;">
-        Dzielnica: <strong style="color: #0f172a;" class="building-district-text">${item.district}</strong>
-      </div>
-    `;
+    setSelectedBuilding(buildingInfo);
 
-    popupRef.current = new maplibregl.Popup({
-      offset: [0, -12],
-      closeButton: true,
-      closeOnClick: false,
-      className: 'krakow-map-popup',
-    })
-      .setLngLat(item.coordinates)
-      .setDOMContent(popupElement)
-      .addTo(mapRef.current);
-
-    popupRef.current.on('close', () => {
-      handleClearSelection();
-    });
+    showBuildingHighlightAndIndicator(mapRef.current, buildingInfo, pointType);
   };
 
   return (
