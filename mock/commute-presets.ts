@@ -14,6 +14,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🏢',
         coordinates: [19.9634, 50.0475],
         frequencyPerWeek: 5,
+        travelMode: 'transit',
       },
       {
         id: 'dest_it_gym',
@@ -22,6 +23,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🏋️',
         coordinates: [19.9450, 50.0520],
         frequencyPerWeek: 3,
+        travelMode: 'bicycling',
       },
       {
         id: 'dest_it_social',
@@ -30,6 +32,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '☕',
         coordinates: [19.9373, 50.0617],
         frequencyPerWeek: 2,
+        travelMode: 'walking',
       },
       {
         id: 'dest_it_shop',
@@ -38,6 +41,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🛍️',
         coordinates: [19.9452, 50.0678],
         frequencyPerWeek: 2,
+        travelMode: 'transit',
       },
     ],
   },
@@ -54,6 +58,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🏫',
         coordinates: [19.9135, 50.0665],
         frequencyPerWeek: 5,
+        travelMode: 'transit',
       },
       {
         id: 'dest_stud_lib',
@@ -62,6 +67,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '📚',
         coordinates: [19.9295, 50.0645],
         frequencyPerWeek: 3,
+        travelMode: 'walking',
       },
       {
         id: 'dest_stud_ms',
@@ -70,6 +76,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🍕',
         coordinates: [19.9075, 50.0690],
         frequencyPerWeek: 3,
+        travelMode: 'bicycling',
       },
       {
         id: 'dest_stud_river',
@@ -78,6 +85,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🌅',
         coordinates: [19.9385, 50.0485],
         frequencyPerWeek: 2,
+        travelMode: 'bicycling',
       },
     ],
   },
@@ -94,6 +102,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🎒',
         coordinates: [19.9250, 50.0780],
         frequencyPerWeek: 5,
+        travelMode: 'walking',
       },
       {
         id: 'dest_fam_work',
@@ -102,6 +111,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '💼',
         coordinates: [19.9690, 50.0655],
         frequencyPerWeek: 5,
+        travelMode: 'transit',
       },
       {
         id: 'dest_fam_parents',
@@ -110,6 +120,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🏡',
         coordinates: [20.0380, 50.0720],
         frequencyPerWeek: 2,
+        travelMode: 'driving',
       },
       {
         id: 'dest_fam_park',
@@ -118,6 +129,7 @@ export const COMMUTE_PROFILES: CommuteProfile[] = [
         icon: '🌳',
         coordinates: [19.9950, 50.0670],
         frequencyPerWeek: 2,
+        travelMode: 'bicycling',
       },
     ],
   },

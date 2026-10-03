@@ -7,6 +7,7 @@ export interface CommuteDestination {
   icon: string;
   coordinates: [number, number]; // [lng, lat]
   frequencyPerWeek: number; // np. 5 dla pracy, 2 dla siłowni
+  travelMode: TravelMode; // środek transportu dla tego konkretnego celu
 }
 
 export interface CommuteRouteResult {

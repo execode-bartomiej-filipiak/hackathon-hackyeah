@@ -117,14 +117,15 @@ export function getRouteStatus(durationMinutes: number): 'optimal' | 'moderate' 
 export function calculateCommuteAnalysis(
   origin: [number, number],
   destinations: CommuteDestination[],
-  mode: TravelMode
+  fallbackMode: TravelMode = 'transit'
 ): CommuteAnalysis {
   let totalWeeklyMinutes = 0;
 
   const routes: CommuteRouteResult[] = destinations.map((dest) => {
     const rawDistance = calculateHaversineKm(origin, dest.coordinates);
     const roadDistanceKm = Number((rawDistance * 1.28).toFixed(1));
-    const durationMinutes = Math.max(3, estimateTravelTimeMinutes(rawDistance, mode));
+    const effectiveMode = dest.travelMode || fallbackMode;
+    const durationMinutes = Math.max(3, estimateTravelTimeMinutes(rawDistance, effectiveMode));
     const status = getRouteStatus(durationMinutes);
     const trajectoryCoordinates = generateTrajectoryCoordinates(origin, dest.coordinates);
 
@@ -139,7 +140,7 @@ export function calculateCommuteAnalysis(
       coordinates: dest.coordinates,
       durationMinutes,
       distanceKm: roadDistanceKm,
-      travelMode: mode,
+      travelMode: effectiveMode,
       status,
       trajectoryCoordinates,
     };

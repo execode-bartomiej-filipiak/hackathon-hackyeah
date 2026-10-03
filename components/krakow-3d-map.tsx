@@ -237,7 +237,21 @@ export function Krakow3DMap() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isAddingTarget]);
 
-  const [travelMode, setTravelMode] = useState<TravelMode>('transit');
+  const handleUpdateDestinationMode = (destinationId: string, mode: TravelMode) => {
+    setProfiles((prev) =>
+      prev.map((p) =>
+        p.id === activeProfile.id
+          ? {
+              ...p,
+              destinations: p.destinations.map((d) =>
+                d.id === destinationId ? { ...d, travelMode: mode } : d
+              ),
+            }
+          : p
+      )
+    );
+  };
+
   const [commuteAnalysis, setCommuteAnalysis] = useState<CommuteAnalysis | null>(null);
   // Aktualizacja markerów celów na mapie 3D
   const updateDestinationMarkers = useCallback(
@@ -546,6 +560,7 @@ export function Krakow3DMap() {
             icon: '🎯',
             coordinates: [currentLng, currentLat],
             frequencyPerWeek: 3,
+            travelMode: 'transit',
           };
 
           setProfiles((prev) =>
@@ -725,8 +740,7 @@ export function Krakow3DMap() {
     if (selectedBuilding) {
       const analysis = calculateCommuteAnalysis(
         selectedBuilding.coordinates,
-        activeProfile.destinations,
-        travelMode
+        activeProfile.destinations
       );
       setCommuteAnalysis(analysis);
       routesRef.current = analysis.routes;
@@ -751,7 +765,6 @@ export function Krakow3DMap() {
   }, [
     selectedBuilding,
     activeProfile,
-    travelMode,
     mapLoaded,
     updateTrajectoriesLayer,
     updateDestinationMarkers,
@@ -1064,11 +1077,7 @@ export function Krakow3DMap() {
 
       {/* PŁYWAJĄCY PANEL COMMUTE HUD (PRAWY GÓRNY RÓG) */}
       <CommuteHud
-        profiles={profiles}
         activeProfile={activeProfile}
-        onSelectProfile={(p) => setActiveProfileId(p.id)}
-        travelMode={travelMode}
-        onSelectTravelMode={(m) => setTravelMode(m)}
         analysis={commuteAnalysis}
         selectedBuildingName={selectedBuilding?.name}
         onFocusDestination={handleFocusDestination}
@@ -1076,6 +1085,7 @@ export function Krakow3DMap() {
         isAddingTarget={isAddingTarget}
         onToggleAddTarget={() => setIsAddingTarget(!isAddingTarget)}
         onRemoveDestination={handleRemoveDestination}
+        onUpdateDestinationMode={handleUpdateDestinationMode}
       />
 
 

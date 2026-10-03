@@ -25,11 +25,7 @@ import {
 } from 'lucide-react';
 
 interface CommuteHudProps {
-  profiles?: CommuteProfile[];
   activeProfile: CommuteProfile;
-  onSelectProfile?: (profile: CommuteProfile) => void;
-  travelMode: TravelMode;
-  onSelectTravelMode: (mode: TravelMode) => void;
   analysis: CommuteAnalysis | null;
   selectedBuildingName?: string;
   onFocusDestination?: (route: CommuteRouteResult) => void;
@@ -37,14 +33,11 @@ interface CommuteHudProps {
   isAddingTarget?: boolean;
   onToggleAddTarget?: () => void;
   onRemoveDestination?: (destinationId: string) => void;
+  onUpdateDestinationMode?: (destinationId: string, mode: TravelMode) => void;
 }
 
 export function CommuteHud({
-  profiles,
   activeProfile,
-  onSelectProfile,
-  travelMode,
-  onSelectTravelMode,
   analysis,
   selectedBuildingName,
   onFocusDestination,
@@ -52,34 +45,12 @@ export function CommuteHud({
   isAddingTarget = false,
   onToggleAddTarget,
   onRemoveDestination,
+  onUpdateDestinationMode,
 }: CommuteHudProps) {
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
     if (score >= 60) return 'text-amber-500 border-amber-500/30 bg-amber-500/10';
     return 'text-rose-500 border-rose-500/30 bg-rose-500/10';
-  };
-
-  const getStatusBadge = (status: 'optimal' | 'moderate' | 'heavy') => {
-    switch (status) {
-      case 'optimal':
-        return (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-            &lt; 15 min
-          </span>
-        );
-      case 'moderate':
-        return (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">
-            15-30 min
-          </span>
-        );
-      case 'heavy':
-        return (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-600 dark:text-rose-400">
-            &gt; 30 min
-          </span>
-        );
-    }
   };
 
   return (
@@ -93,57 +64,6 @@ export function CommuteHud({
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Analiza Dojazdów 3D
             </span>
-          </div>
-
-          {/* PRZEŁĄCZNIK ŚRODKA TRANSPORTU */}
-          <div className="flex items-center justify-between gap-1 p-1 bg-muted/40 rounded-lg border border-border/40 text-xs">
-            <button
-              onClick={() => onSelectTravelMode('transit')}
-              className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-[11px] transition-colors ${
-                travelMode === 'transit'
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <TrainIcon className="size-3" />
-              <span>MPK</span>
-            </button>
-
-            <button
-              onClick={() => onSelectTravelMode('driving')}
-              className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-[11px] transition-colors ${
-                travelMode === 'driving'
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <CarIcon className="size-3" />
-              <span>Auto</span>
-            </button>
-
-            <button
-              onClick={() => onSelectTravelMode('bicycling')}
-              className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-[11px] transition-colors ${
-                travelMode === 'bicycling'
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <BikeIcon className="size-3" />
-              <span>Rower</span>
-            </button>
-
-            <button
-              onClick={() => onSelectTravelMode('walking')}
-              className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-[11px] transition-colors ${
-                travelMode === 'walking'
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <FootprintsIcon className="size-3" />
-              <span>Pieszo</span>
-            </button>
           </div>
 
           {/* JEŚLI BRAK WYBRANEGO BUDYNKU */}
@@ -175,7 +95,7 @@ export function CommuteHud({
                 )}
               </div>
 
-              {/* LISTA ZDEFINIOWANYCH CELÓW Z PRZYCISKIEM DODAWANIA */}
+              {/* LISTA ZDEFINIOWANYCH CELÓW Z PRZEŁĄCZNIKAMI TRANSPORTU */}
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
                   <span>Zdefiniowane cele podróży ({activeProfile.destinations.length}):</span>
@@ -200,16 +120,70 @@ export function CommuteHud({
                         </div>
                       </div>
 
-                      {onRemoveDestination && activeProfile.destinations.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => onRemoveDestination(dest.id)}
-                          className="opacity-60 hover:opacity-100 p-1 hover:text-rose-500 transition-colors"
-                          title="Usuń cel"
-                        >
-                          <XIcon className="size-3.5" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* PRZEŁĄCZNIK ŚRODKA TRANSPORTU DLA CELU */}
+                        <div className="flex items-center gap-0.5 bg-muted/60 p-0.5 rounded-lg border border-border/40">
+                          <button
+                            type="button"
+                            onClick={() => onUpdateDestinationMode?.(dest.id, 'transit')}
+                            className={`p-1 rounded text-[10px] transition-colors ${
+                              dest.travelMode === 'transit'
+                                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            title="MPK (Tramwaj / Autobus)"
+                          >
+                            <TrainIcon className="size-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateDestinationMode?.(dest.id, 'driving')}
+                            className={`p-1 rounded text-[10px] transition-colors ${
+                              dest.travelMode === 'driving'
+                                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            title="Samochód"
+                          >
+                            <CarIcon className="size-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateDestinationMode?.(dest.id, 'bicycling')}
+                            className={`p-1 rounded text-[10px] transition-colors ${
+                              dest.travelMode === 'bicycling'
+                                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            title="Rower"
+                          >
+                            <BikeIcon className="size-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateDestinationMode?.(dest.id, 'walking')}
+                            className={`p-1 rounded text-[10px] transition-colors ${
+                              dest.travelMode === 'walking'
+                                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            title="Pieszo"
+                          >
+                            <FootprintsIcon className="size-3" />
+                          </button>
+                        </div>
+
+                        {onRemoveDestination && activeProfile.destinations.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveDestination(dest.id)}
+                            className="opacity-60 hover:opacity-100 p-1 hover:text-rose-500 transition-colors"
+                            title="Usuń cel"
+                          >
+                            <XIcon className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -286,57 +260,125 @@ export function CommuteHud({
                 </div>
 
                 <div className="divide-y divide-border/60 rounded-xl border border-border bg-card overflow-hidden">
-                  {analysis.routes.map((route) => (
-                    <div
-                      key={route.destinationId}
-                      onClick={() => onFocusDestination?.(route)}
-                      className="group flex items-center justify-between p-2.5 hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 pr-2">
-                        <span className="text-sm shrink-0">{route.destinationIcon}</span>
-                        <div className="min-w-0 space-y-0.5">
-                          <div className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                            {route.destinationName}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-                            <span>{route.distanceKm} km</span>
-                            <span>•</span>
-                            <span className="flex items-center gap-0.5">
-                              <MapPinIcon className="size-2.5" />
-                              {activeProfile.destinations.find((d) => d.id === route.destinationId)
-                                ?.frequencyPerWeek}
-                              x/tydz.
-                            </span>
+                  {analysis.routes.map((route) => {
+                    const dest = activeProfile.destinations.find(
+                      (d) => d.id === route.destinationId
+                    );
+                    const currentMode = dest?.travelMode || route.travelMode;
+
+                    return (
+                      <div
+                        key={route.destinationId}
+                        onClick={() => onFocusDestination?.(route)}
+                        className="group flex items-center justify-between p-2.5 hover:bg-muted/50 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 pr-1.5">
+                          <span className="text-sm shrink-0">{route.destinationIcon}</span>
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                              {route.destinationName}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                              <span>{route.distanceKm} km</span>
+                              <span>•</span>
+                              <span className="flex items-center gap-0.5">
+                                <MapPinIcon className="size-2.5" />
+                                {dest?.frequencyPerWeek || 3}x/tydz.
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="text-right">
-                          <div className="text-xs font-bold text-foreground">
-                            {route.durationMinutes} min
-                          </div>
-                          {getStatusBadge(route.status)}
-                        </div>
-
-                        {onRemoveDestination && activeProfile.destinations.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRemoveDestination(route.destinationId);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 transition-opacity"
-                            title="Usuń cel"
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* PRZEŁĄCZNIK TRANSPORTU DLA TEGO CELU */}
+                          <div
+                            className="flex items-center gap-0.5 bg-muted/60 p-0.5 rounded-lg border border-border/40"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <XIcon className="size-3.5" />
-                          </button>
-                        )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateDestinationMode?.(route.destinationId, 'transit')
+                              }
+                              className={`p-1 rounded text-[10px] transition-colors ${
+                                currentMode === 'transit'
+                                  ? 'bg-primary text-primary-foreground shadow-xs'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                              title="MPK (Tramwaj / Autobus)"
+                            >
+                              <TrainIcon className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateDestinationMode?.(route.destinationId, 'driving')
+                              }
+                              className={`p-1 rounded text-[10px] transition-colors ${
+                                currentMode === 'driving'
+                                  ? 'bg-primary text-primary-foreground shadow-xs'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                              title="Samochód"
+                            >
+                              <CarIcon className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateDestinationMode?.(route.destinationId, 'bicycling')
+                              }
+                              className={`p-1 rounded text-[10px] transition-colors ${
+                                currentMode === 'bicycling'
+                                  ? 'bg-primary text-primary-foreground shadow-xs'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                              title="Rower"
+                            >
+                              <BikeIcon className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateDestinationMode?.(route.destinationId, 'walking')
+                              }
+                              className={`p-1 rounded text-[10px] transition-colors ${
+                                currentMode === 'walking'
+                                  ? 'bg-primary text-primary-foreground shadow-xs'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                              title="Pieszo"
+                            >
+                              <FootprintsIcon className="size-3" />
+                            </button>
+                          </div>
 
-                        <ChevronRightIcon className="size-3.5 text-muted-foreground group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
+                          {/* CZAS BEZ BADGE'A <15m */}
+                          <div className="text-right min-w-[44px]">
+                            <div className="text-xs font-bold text-foreground">
+                              {route.durationMinutes} min
+                            </div>
+                          </div>
+
+                          {onRemoveDestination && activeProfile.destinations.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveDestination(route.destinationId);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 transition-opacity"
+                              title="Usuń cel"
+                            >
+                              <XIcon className="size-3.5" />
+                            </button>
+                          )}
+
+                          <ChevronRightIcon className="size-3.5 text-muted-foreground group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* PRZYCISK DODAWANIA NOWEGO CELU W TRYBIE ANALIZY */}
