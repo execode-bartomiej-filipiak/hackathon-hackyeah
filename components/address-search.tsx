@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { SearchIcon, MapPinIcon, XIcon, Loader2Icon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export interface SearchResultItem {
   id: string;
@@ -18,22 +19,36 @@ interface AddressSearchProps {
 }
 
 export function AddressSearch({ onSelectLocation, className = '' }: AddressSearchProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Zamykanie listy podpowiedzi po kliknięciu poza komponentem
+  // Focus inputu po rozwinięciu
+  useEffect(() => {
+    if (isExpanded) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  }, [isExpanded]);
+
+  // Zamykanie listy podpowiedzi i zwijanie po kliknięciu poza komponentem
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        if (!query.trim()) {
+          setIsExpanded(false);
+        }
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [query]);
 
   // Wyszukiwanie debounced przez Photon API
   useEffect(() => {
@@ -52,6 +67,7 @@ export function AddressSearch({ onSelectLocation, className = '' }: AddressSearc
         const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(
           trimmed
         )}&lat=50.0617&lon=19.9373&limit=5`;
+
         const res = await fetch(url, { signal: controller.signal });
         if (res.ok) {
           const data = (await res.json()) as {
@@ -118,54 +134,72 @@ export function AddressSearch({ onSelectLocation, className = '' }: AddressSearc
     onSelectLocation(item);
   };
 
-  const handleClear = () => {
+  const handleCollapse = () => {
+    setIsExpanded(false);
+    setIsOpen(false);
     setQuery('');
     setResults([]);
-    setIsOpen(false);
   };
 
   return (
     <div ref={containerRef} className={`relative select-none font-sans ${className}`}>
-      <div className="relative flex items-center">
-        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-          {isLoading ? (
-            <Loader2Icon className="size-3.5 animate-spin text-primary" />
-          ) : (
-            <SearchIcon className="size-3.5" />
-          )}
-        </div>
+      {!isExpanded ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsExpanded(true)}
+          className="size-7 p-0 hover:border-primary/50 text-muted-foreground hover:text-foreground"
+          title="Szukaj adresu w Krakowie"
+          aria-label="Szukaj adresu w Krakowie"
+        >
+          <SearchIcon className="size-3.5 text-primary" />
+        </Button>
+      ) : (
+        <div className="relative flex items-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+            {isLoading ? (
+              <Loader2Icon className="size-3.5 animate-spin text-primary" />
+            ) : (
+              <SearchIcon className="size-3.5 text-primary" />
+            )}
+          </div>
 
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => {
-            if (results.length > 0) setIsOpen(true);
-          }}
-          placeholder="Szukaj ulicy lub miejsca w Krakowie..."
-          className="h-8 w-56 sm:w-72 pl-8 pr-7 text-xs bg-background/90 backdrop-blur-md border-border/80 shadow-md rounded-xl transition-all focus-visible:w-64 sm:focus-visible:w-80 font-medium"
-        />
+          <Input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => {
+              if (results.length > 0) setIsOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                handleCollapse();
+              }
+            }}
+            placeholder="Szukaj ulicy..."
+            className="h-7 w-48 sm:w-60 pl-7 pr-6 text-xs bg-background/95 border-border/80 rounded-lg font-medium shadow-inner"
+          />
 
-        {query && (
           <button
             type="button"
-            onClick={handleClear}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
-            title="Wyczyść"
+            onClick={handleCollapse}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+            title="Zamknij wyszukiwarkę"
           >
             <XIcon className="size-3" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ROZWIJANA LISTA WYNIKÓW */}
-      {isOpen && results.length > 0 && (
-        <div className="absolute top-10 left-0 right-0 z-50 rounded-xl border border-border/80 bg-background/95 backdrop-blur-md shadow-2xl overflow-hidden divide-y divide-border/60 animate-in fade-in slide-in-from-top-1 text-xs">
+      {isExpanded && isOpen && results.length > 0 && (
+        <div className="absolute top-9 left-0 w-64 sm:w-72 z-50 rounded-xl border border-border/80 bg-background/95 backdrop-blur-md shadow-2xl overflow-hidden divide-y divide-border/60 animate-in fade-in slide-in-from-top-1 text-xs">
           {results.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => handleSelect(item)}
-              className="w-full text-left p-2.5 hover:bg-muted/60 transition-colors flex items-center gap-2.5 cursor-pointer group"
+              className="w-full text-left p-2.5 hover:bg-muted/60 transition-colors flex items-center gap-2 cursor-pointer group"
             >
               <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                 <MapPinIcon className="size-3.5" />

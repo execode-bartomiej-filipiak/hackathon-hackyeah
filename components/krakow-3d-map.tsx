@@ -1623,43 +1623,41 @@ export function Krakow3DMap() {
       )}
 
       {/* PŁYWAJĄCY PASEK KONTROLI KAMERY 3D ORAZ WYSZUKIWARKA ADRESÓW (LEWY GÓRNY RÓG) */}
-      <div className="absolute top-4 left-14 z-20 flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 bg-background/90 backdrop-blur-md p-2 rounded-xl border border-border/80 shadow-lg">
-          <Button
-            variant={isRotating ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setIsRotating(!isRotating)}
-            className="text-xs h-7 px-2.5 gap-1.5 font-medium"
-          >
-            <RotateCwIcon className={`size-3.5 ${isRotating ? 'animate-spin' : ''}`} />
-            {isRotating ? 'Zatrzymaj' : 'Obrót 360°'}
-          </Button>
+      <div className="absolute top-4 left-14 z-20 flex items-center gap-2 bg-background/90 backdrop-blur-md p-1.5 rounded-xl border border-border/80 shadow-lg">
+        <Button
+          variant={isRotating ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setIsRotating(!isRotating)}
+          className="text-xs h-7 px-2.5 gap-1.5 font-medium"
+        >
+          <RotateCwIcon className={`size-3.5 ${isRotating ? 'animate-spin' : ''}`} />
+          {isRotating ? 'Zatrzymaj' : 'Obrót 360°'}
+        </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCenterOnSelectedBuilding}
-            disabled={!activeOriginBuilding}
-            className="size-7 p-0 disabled:opacity-50"
-            title={activeOriginBuilding ? `Wycentruj na: ${activeOriginBuilding.name}` : 'Wskaż miejsce zamieszkania lub budynek na mapie'}
-            aria-label="Centruj na wybranym punkcie"
-          >
-            <LocateFixedIcon className="size-3.5 text-primary" />
-          </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCenterOnSelectedBuilding}
+          disabled={!activeOriginBuilding}
+          className="size-7 p-0 disabled:opacity-50"
+          title={activeOriginBuilding ? `Wycentruj na: ${activeOriginBuilding.name}` : 'Wskaż miejsce zamieszkania lub budynek na mapie'}
+          aria-label="Centruj na wybranym punkcie"
+        >
+          <LocateFixedIcon className="size-3.5 text-primary" />
+        </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (mapRef.current) {
-                mapRef.current.easeTo({ pitch: 62, bearing: -20 });
-              }
-            }}
-            className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
-          >
-            Reset
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (mapRef.current) {
+              mapRef.current.easeTo({ pitch: 62, bearing: -20 });
+            }
+          }}
+          className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
+        >
+          Reset
+        </Button>
 
         <AddressSearch onSelectLocation={handleSelectSearchResult} />
       </div>
