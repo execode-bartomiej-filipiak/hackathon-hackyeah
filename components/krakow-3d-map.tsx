@@ -45,6 +45,14 @@ interface PendingNewDestination {
   district: string;
 }
 
+interface PulseLineFeature {
+  type: 'Feature';
+  properties: { status: 'optimal' | 'moderate' | 'heavy' };
+  geometry: {
+    type: 'LineString';
+    coordinates: Array<[number, number]>;
+  };
+}
 
 function getDistrict(lng: number, lat: number): string {
   const distRynek = Math.hypot(lng - 19.9373, lat - 50.0617);
@@ -190,6 +198,8 @@ export function Krakow3DMap() {
   const isRotatingRef = useRef(false);
   const destinationMarkersRef = useRef<maplibregl.Marker[]>([]);
   const routesRef = useRef<CommuteRouteResult[]>([]);
+  const animProgressRef = useRef(0);
+  const animFrameRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuildingInfo | null>(null);
   const [pitch, setPitch] = useState(62);
@@ -440,6 +450,52 @@ export function Krakow3DMap() {
         });
       }
 
+      // Źródło i warstwy dla animowanych wiązek światła wzdłuż linii (tylko linie, bez orbów)
+      if (!mapInstance.getSource('commute-pulses-source')) {
+        mapInstance.addSource('commute-pulses-source', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+
+        // Poświata pędzącej wiązki światła (dopasowana do koloru statusu linii)
+        mapInstance.addLayer({
+          id: 'commute-pulses-glow',
+          type: 'line',
+          source: 'commute-pulses-source',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-width': 8,
+            'line-color': [
+              'match',
+              ['get', 'status'],
+              'optimal',
+              '#10b981',
+              'moderate',
+              '#f59e0b',
+              'heavy',
+              '#ef4444',
+              '#6366f1',
+            ],
+            'line-blur': 2.5,
+            'line-opacity': 0.7,
+          },
+        });
+
+        // Jasny rdzeń pędzącej wiązki linii
+        mapInstance.addLayer({
+          id: 'commute-pulses-core',
+          type: 'line',
+          source: 'commute-pulses-source',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-width': 3.5,
+            'line-color': '#ffffff',
+            'line-blur': 0.5,
+            'line-opacity': 0.95,
+          },
+        });
+      }
+
       // Kursor pointer nad budynkami 3D
       const buildingLayerIds = ['building-3d', 'building'].filter((id) => mapInstance.getLayer(id));
 
@@ -680,6 +736,10 @@ export function Krakow3DMap() {
       routesRef.current = [];
       updateTrajectoriesLayer(map, []);
       updateDestinationMarkers(map, activeProfile.destinations, []);
+      const pulseSrc = map.getSource('commute-pulses-source');
+      if (pulseSrc && pulseSrc.type === 'geojson') {
+        (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+      }
     }
   }, [
     selectedBuilding,
@@ -688,6 +748,94 @@ export function Krakow3DMap() {
     updateTrajectoriesLayer,
     updateDestinationMarkers,
   ]);
+
+  // Ciągła pętla animacji pulsujących wiązek światła wzdłuż linii (tylko linie, bez orbów)
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
+    const map = mapRef.current;
+
+    const animate = () => {
+      const routes = routesRef.current;
+
+      if (routes.length > 0) {
+        animProgressRef.current = (animProgressRef.current + 0.0075) % 1;
+        const cycle = animProgressRef.current; // [0, 1)
+
+        const pulseLines: PulseLineFeature[] = [];
+
+        // Faza aktywnego pulsu trwa 76% cyklu, a pozostałe 24% to pauza (oddech pulsu)
+        const ACTIVE_RATIO = 0.76;
+
+        if (cycle < ACTIVE_RATIO) {
+          const norm = cycle / ACTIVE_RATIO; // [0, 1]
+          const pHead = Math.min(1, norm * 1.16);
+          const pTail = Math.max(0, (norm - 0.14) * 1.16);
+
+          if (pTail < 1) {
+            routes.forEach((r) => {
+              const coords = r.trajectoryCoordinates;
+              const total = coords.length;
+              if (total < 2) return;
+
+              // Precyzyjna ciągła interpolacja pozycji czoła wiązki
+              const exactHead = pHead * (total - 1);
+              const iHead = Math.min(total - 2, Math.floor(exactHead));
+              const fHead = exactHead - iHead;
+              const headPt: [number, number] = [
+                coords[iHead][0] + (coords[iHead + 1][0] - coords[iHead][0]) * fHead,
+                coords[iHead][1] + (coords[iHead + 1][1] - coords[iHead][1]) * fHead,
+              ];
+
+              // Precyzyjna interpolacja pozycji ogona wiązki
+              const exactTail = pTail * (total - 1);
+              const iTail = Math.min(total - 2, Math.floor(exactTail));
+              const fTail = exactTail - iTail;
+              const tailPt: [number, number] = [
+                coords[iTail][0] + (coords[iTail + 1][0] - coords[iTail][0]) * fTail,
+                coords[iTail][1] + (coords[iTail + 1][1] - coords[iTail][1]) * fTail,
+              ];
+
+              // Składanie geometrii wiązki linii
+              const beamCoords: Array<[number, number]> = [tailPt];
+              for (let i = iTail + 1; i <= iHead; i++) {
+                beamCoords.push(coords[i]);
+              }
+              beamCoords.push(headPt);
+
+              if (beamCoords.length >= 2) {
+                pulseLines.push({
+                  type: 'Feature',
+                  properties: { status: r.status },
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: beamCoords,
+                  },
+                });
+              }
+            });
+          }
+        }
+
+        const pulseSource = map.getSource('commute-pulses-source');
+        if (pulseSource && pulseSource.type === 'geojson') {
+          (pulseSource as GeoJSONSource).setData({
+            type: 'FeatureCollection',
+            features: pulseLines,
+          });
+        }
+      }
+
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    };
+  }, [mapLoaded]);
   // Rotacja animowana 360°
   useEffect(() => {
     isRotatingRef.current = isRotating;
@@ -725,6 +873,10 @@ export function Krakow3DMap() {
       const selSrc = mapRef.current.getSource('selected-building-source');
       if (selSrc && selSrc.type === 'geojson') {
         (selSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+      }
+      const pulseSrc = mapRef.current.getSource('commute-pulses-source');
+      if (pulseSrc && pulseSrc.type === 'geojson') {
+        (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
       }
     }
     isSwitchingBuildingRef.current = false;
