@@ -32,35 +32,23 @@ export function calculateHaversineKm(
 }
 
 /**
- * Generuje łukowatą trajektorię 3D (krzywa Béziera) łączącą punkt początkowy z docelowym
+ * Generuje próbkowaną trajektorię łączącą punkt początkowy z docelowym.
+ * Punkty służą jako podstawa łuku 3D, który jest unoszony pionowo nad mapą
+ * podczas renderowania (patrz nakładka canvas w components/krakow-3d-map.tsx).
  */
 export function generateTrajectoryCoordinates(
   origin: [number, number],
   dest: [number, number],
-  numPoints = 40
+  numPoints = 48
 ): Array<[number, number]> {
   const [lng1, lat1] = origin;
   const [lng2, lat2] = dest;
 
-  const midLng = (lng1 + lng2) / 2;
-  const midLat = (lat1 + lat2) / 2;
-
-  // Wektor prostopadły do linii prostej (nadający łuk)
-  const dLng = lng2 - lng1;
-  const dLat = lat2 - lat1;
-  const curvature = 0.12;
-
-  const perpLng = -dLat * curvature;
-  const perpLat = dLng * curvature;
-
-  const ctrlLng = midLng + perpLng;
-  const ctrlLat = midLat + perpLat;
-
   const points: Array<[number, number]> = [];
   for (let i = 0; i <= numPoints; i++) {
     const t = i / numPoints;
-    const lng = (1 - t) * (1 - t) * lng1 + 2 * (1 - t) * t * ctrlLng + t * t * lng2;
-    const lat = (1 - t) * (1 - t) * lat1 + 2 * (1 - t) * t * ctrlLat + t * t * lat2;
+    const lng = lng1 + (lng2 - lng1) * t;
+    const lat = lat1 + (lat2 - lat1) * t;
     points.push([Number(lng.toFixed(6)), Number(lat.toFixed(6))]);
   }
   return points;
@@ -149,7 +137,7 @@ export function calculateCommuteAnalysis(
     const effectiveMode = dest.travelMode || fallbackMode;
     const durationMinutes = Math.max(3, estimateTravelTimeMinutes(rawDistance, effectiveMode));
     const status = getRouteStatus(durationMinutes);
-    const trajectoryCoordinates = generateTrajectoryCoordinates(origin, dest.coordinates);
+    const trajectoryCoordinates = generateTrajectoryCoordinates(origin, dest.coordinates, 48);
     const co2EmissionKg = Number((roadDistanceKm * getCo2FactorKgPerKm(effectiveMode)).toFixed(2));
 
     // Podróż w obie strony pomnożona przez częstotliwość w tygodniu

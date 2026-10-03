@@ -51,15 +51,6 @@ interface PendingNewDestination {
   district: string;
 }
 
-interface PulseLineFeature {
-  type: 'Feature';
-  properties: { status: 'optimal' | 'moderate' | 'heavy' };
-  geometry: {
-    type: 'LineString';
-    coordinates: Array<[number, number]>;
-  };
-}
-
 function getDistrict(lng: number, lat: number): string {
   const distRynek = Math.hypot(lng - 19.9373, lat - 50.0617);
   const distWawel = Math.hypot(lng - 19.9354, lat - 50.0540);
@@ -206,6 +197,7 @@ export function Krakow3DMap() {
   const routesRef = useRef<CommuteRouteResult[]>([]);
   const animProgressRef = useRef(0);
   const animFrameRef = useRef<number | null>(null);
+  const arcsCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuildingInfo | null>(null);
   const [homeBuilding, setHomeBuilding] = useState<SelectedBuildingInfo | null>(null);
@@ -368,6 +360,8 @@ export function Krakow3DMap() {
           });
         };
 
+        el.style.zIndex = '6';
+
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat(dest.coordinates)
           .addTo(map);
@@ -377,28 +371,6 @@ export function Krakow3DMap() {
     },
     []
   );
-
-  // Aktualizacja trajektorii GeoJSON na mapie
-  const updateTrajectoriesLayer = useCallback((map: Map, routes: CommuteRouteResult[]) => {
-    const source = map.getSource('commute-trajectories-source');
-    if (source && source.type === 'geojson') {
-      const geoSource = source as GeoJSONSource;
-      geoSource.setData({
-        type: 'FeatureCollection',
-        features: routes.map((route) => ({
-          type: 'Feature',
-          properties: {
-            status: route.status,
-            duration: route.durationMinutes,
-          },
-          geometry: {
-            type: 'LineString',
-            coordinates: route.trajectoryCoordinates,
-          },
-        })),
-      });
-    }
-  }, []);
 
   // Inicjalizacja Mapy
   useEffect(() => {
@@ -453,116 +425,6 @@ export function Krakow3DMap() {
             'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 18],
             'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
             'fill-extrusion-opacity': 0.95,
-          },
-        });
-      }
-
-      // Źródło i warstwy trajektorii dojazdów (Commute Lines)
-      if (!mapInstance.getSource('commute-trajectories-source')) {
-        mapInstance.addSource('commute-trajectories-source', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: [],
-          },
-        });
-
-        // Efekt poświaty linii
-        mapInstance.addLayer({
-          id: 'commute-trajectories-glow',
-          type: 'line',
-          source: 'commute-trajectories-source',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round',
-          },
-          paint: {
-            'line-width': 8,
-            'line-opacity': 0.4,
-            'line-color': [
-              'match',
-              ['get', 'status'],
-              'optimal',
-              '#10b981',
-              'moderate',
-              '#f59e0b',
-              'heavy',
-              '#ef4444',
-              '#6366f1',
-            ],
-            'line-blur': 3,
-          },
-        });
-
-        // Główna linia trajektorii
-        mapInstance.addLayer({
-          id: 'commute-trajectories-line',
-          type: 'line',
-          source: 'commute-trajectories-source',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round',
-          },
-          paint: {
-            'line-width': 4,
-            'line-opacity': 0.95,
-            'line-color': [
-              'match',
-              ['get', 'status'],
-              'optimal',
-              '#10b981',
-              'moderate',
-              '#f59e0b',
-              'heavy',
-              '#ef4444',
-              '#6366f1',
-            ],
-          },
-        });
-      }
-
-      // Źródło i warstwy dla animowanych wiązek światła wzdłuż linii (tylko linie, bez orbów)
-      if (!mapInstance.getSource('commute-pulses-source')) {
-        mapInstance.addSource('commute-pulses-source', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] },
-        });
-
-        // Poświata pędzącej wiązki światła (dopasowana do koloru statusu linii)
-        mapInstance.addLayer({
-          id: 'commute-pulses-glow',
-          type: 'line',
-          source: 'commute-pulses-source',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-width': 8,
-            'line-color': [
-              'match',
-              ['get', 'status'],
-              'optimal',
-              '#10b981',
-              'moderate',
-              '#f59e0b',
-              'heavy',
-              '#ef4444',
-              '#6366f1',
-            ],
-            'line-blur': 2.5,
-            'line-opacity': 0.7,
-          },
-        });
-
-        // Jasny rdzeń pędzącej wiązki linii
-        mapInstance.addLayer({
-          id: 'commute-pulses-core',
-          type: 'line',
-          source: 'commute-pulses-source',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-width': 3.5,
-            'line-color': '#ffffff',
-            'line-blur': 0.5,
-            'line-opacity': 0.95,
           },
         });
       }
@@ -780,7 +642,6 @@ export function Krakow3DMap() {
             : cachedAnalysisRef.current.reference;
         setCommuteAnalysis(target);
         routesRef.current = target.routes;
-        updateTrajectoriesLayer(map, target.routes);
         updateDestinationMarkers(map, currentDestinations, target.routes);
         return;
       }
@@ -804,17 +665,11 @@ export function Krakow3DMap() {
 
       setCommuteAnalysis(baseAnalysis);
       routesRef.current = baseAnalysis.routes;
-      updateTrajectoriesLayer(map, baseAnalysis.routes);
       updateDestinationMarkers(map, currentDestinations, baseAnalysis.routes);
     } else {
       setCommuteAnalysis(null);
       routesRef.current = [];
-      updateTrajectoriesLayer(map, []);
       updateDestinationMarkers(map, currentDestinations, []);
-      const pulseSrc = map.getSource('commute-pulses-source');
-      if (pulseSrc && pulseSrc.type === 'geojson') {
-        (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
-      }
     }
   }, [
     activeOriginBuilding,
@@ -824,90 +679,185 @@ export function Krakow3DMap() {
     mapLoaded,
     hasPresetLoaded,
     customDestinations,
-    updateTrajectoriesLayer,
     updateDestinationMarkers,
   ]);
 
-  // Ciągła pętla animacji pulsujących wiązek światła wzdłuż linii (tylko linie, bez orbów)
+  // Nakładka canvas: łuki 3D wznoszące się nad miastem + synchroniczne wiązki światła
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
+    const canvas = arcsCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    const animate = () => {
-      const routes = routesRef.current;
-
-      if (routes.length > 0) {
-        animProgressRef.current = (animProgressRef.current + 0.0075) % 1;
-        const cycle = animProgressRef.current; // [0, 1)
-
-        const pulseLines: PulseLineFeature[] = [];
-
-        // Faza aktywnego pulsu trwa 76% cyklu, a pozostałe 24% to pauza (oddech pulsu)
-        const ACTIVE_RATIO = 0.76;
-
-        if (cycle < ACTIVE_RATIO) {
-          const norm = cycle / ACTIVE_RATIO; // [0, 1]
-          const pHead = Math.min(1, norm * 1.16);
-          const pTail = Math.max(0, (norm - 0.14) * 1.16);
-
-          if (pTail < 1) {
-            routes.forEach((r) => {
-              const coords = r.trajectoryCoordinates;
-              const total = coords.length;
-              if (total < 2) return;
-
-              // Precyzyjna ciągła interpolacja pozycji czoła wiązki
-              const exactHead = pHead * (total - 1);
-              const iHead = Math.min(total - 2, Math.floor(exactHead));
-              const fHead = exactHead - iHead;
-              const headPt: [number, number] = [
-                coords[iHead][0] + (coords[iHead + 1][0] - coords[iHead][0]) * fHead,
-                coords[iHead][1] + (coords[iHead + 1][1] - coords[iHead][1]) * fHead,
-              ];
-
-              // Precyzyjna interpolacja pozycji ogona wiązki
-              const exactTail = pTail * (total - 1);
-              const iTail = Math.min(total - 2, Math.floor(exactTail));
-              const fTail = exactTail - iTail;
-              const tailPt: [number, number] = [
-                coords[iTail][0] + (coords[iTail + 1][0] - coords[iTail][0]) * fTail,
-                coords[iTail][1] + (coords[iTail + 1][1] - coords[iTail][1]) * fTail,
-              ];
-
-              // Składanie geometrii wiązki linii
-              const beamCoords: Array<[number, number]> = [tailPt];
-              for (let i = iTail + 1; i <= iHead; i++) {
-                beamCoords.push(coords[i]);
-              }
-              beamCoords.push(headPt);
-
-              if (beamCoords.length >= 2) {
-                pulseLines.push({
-                  type: 'Feature',
-                  properties: { status: r.status },
-                  geometry: {
-                    type: 'LineString',
-                    coordinates: beamCoords,
-                  },
-                });
-              }
-            });
-          }
-        }
-
-        const pulseSource = map.getSource('commute-pulses-source');
-        if (pulseSource && pulseSource.type === 'geojson') {
-          (pulseSource as GeoJSONSource).setData({
-            type: 'FeatureCollection',
-            features: pulseLines,
-          });
-        }
-      }
-
-      animFrameRef.current = requestAnimationFrame(animate);
+    const STATUS_COLOR: Record<string, string> = {
+      optimal: '#10b981',
+      moderate: '#f59e0b',
+      heavy: '#f43f5e',
     };
 
-    animFrameRef.current = requestAnimationFrame(animate);
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const w = Math.round(width * dpr);
+      const h = Math.round(height * dpr);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    // Gładka krzywa przechodząca przez punkty ekranowe (zaokrąglenie punktami środkowymi)
+    const strokeCurve = (pts: Array<{ x: number; y: number }>) => {
+      ctx.beginPath();
+      if (pts.length < 2) return;
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const mx = (pts[i].x + pts[i + 1].x) / 2;
+        const my = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+      }
+      const prev = pts[pts.length - 2];
+      const last = pts[pts.length - 1];
+      ctx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
+    };
+
+    const render = () => {
+      resize();
+      ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+      const routes = routesRef.current;
+      if (routes.length > 0) {
+        animProgressRef.current = (animProgressRef.current + 0.0055) % 1;
+        const progress = animProgressRef.current;
+
+        // 1. Cień rzucany na miasto — podkreśla wysokość łuku
+        routes.forEach((route) => {
+          const ground = route.trajectoryCoordinates.map((c) => map.project(c));
+          if (ground.length < 2) return;
+          ctx.save();
+          ctx.globalAlpha = 0.16;
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 5;
+          ctx.lineCap = 'round';
+          ctx.shadowColor = 'rgba(15, 23, 42, 0.55)';
+          ctx.shadowBlur = 14;
+          ctx.shadowOffsetY = 12;
+          strokeCurve(ground);
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        // 2. Łuki 3D wznoszące się nad miastem
+        const liftedPerRoute: Array<Array<{ x: number; y: number }>> = [];
+        routes.forEach((route) => {
+          const ground = route.trajectoryCoordinates.map((c) => map.project(c));
+          if (ground.length < 2) {
+            liftedPerRoute.push([]);
+            return;
+          }
+
+          const chord = Math.hypot(
+            ground[ground.length - 1].x - ground[0].x,
+            ground[ground.length - 1].y - ground[0].y
+          );
+          const lift = Math.min(Math.max(chord * 0.34, 46), 240);
+          const lifted = ground.map((p, i) => {
+            const t = i / (ground.length - 1);
+            return { x: p.x, y: p.y - lift * 4 * t * (1 - t) };
+          });
+          liftedPerRoute.push(lifted);
+
+          const color = STATUS_COLOR[route.status] ?? '#6366f1';
+
+          ctx.save();
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          // Poświata łuku
+          ctx.globalAlpha = 0.45;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 9;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 16;
+          strokeCurve(lifted);
+          ctx.stroke();
+
+          // Neonowy obrys łuku
+          ctx.globalAlpha = 1;
+          ctx.shadowBlur = 0;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 3.4;
+          strokeCurve(lifted);
+          ctx.stroke();
+
+          // Jasny rdzeń łuku
+          ctx.globalAlpha = 0.95;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.4;
+          strokeCurve(lifted);
+          ctx.stroke();
+
+          ctx.restore();
+        });
+
+        // 3. Synchroniczne wiązki światła biegnące po łukach (identyczny czas dla wszystkich)
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        const TRAIL_LENGTH = 0.26;
+
+        routes.forEach((route, routeIndex) => {
+          const lifted = liftedPerRoute[routeIndex];
+          if (!lifted || lifted.length < 2) return;
+
+          const lastIndex = lifted.length - 1;
+          const sampleAt = (p: number) => {
+            const exact = Math.min(Math.max(p, 0), 1) * lastIndex;
+            const i = Math.min(lastIndex - 1, Math.max(0, Math.floor(exact)));
+            const f = exact - i;
+            return {
+              x: lifted[i].x + (lifted[i + 1].x - lifted[i].x) * f,
+              y: lifted[i].y + (lifted[i + 1].y - lifted[i].y) * f,
+            };
+          };
+
+          const head = progress;
+          const tail = Math.max(0, progress - TRAIL_LENGTH);
+          const iStart = Math.floor(tail * lastIndex);
+          const iEnd = Math.ceil(head * lastIndex);
+          if (iEnd <= iStart + 1) return;
+
+          const segment: Array<{ x: number; y: number }> = [sampleAt(tail)];
+          for (let i = iStart + 1; i < iEnd; i++) segment.push(lifted[i]);
+          segment.push(sampleAt(head));
+
+          const color = STATUS_COLOR[route.status] ?? '#6366f1';
+          ctx.globalAlpha = 0.85;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 7;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 18;
+          strokeCurve(segment);
+          ctx.stroke();
+
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.6;
+          ctx.shadowBlur = 8;
+          strokeCurve(segment);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+
+      animFrameRef.current = requestAnimationFrame(render);
+    };
+
+    animFrameRef.current = requestAnimationFrame(render);
 
     return () => {
       if (animFrameRef.current) {
@@ -954,16 +904,11 @@ export function Krakow3DMap() {
       selectedMarkerRef.current = null;
     }
     if (mapRef.current) {
-      updateTrajectoriesLayer(mapRef.current, []);
       destinationMarkersRef.current.forEach((m) => m.remove());
       destinationMarkersRef.current = [];
       const selSrc = mapRef.current.getSource('selected-building-source');
       if (selSrc && selSrc.type === 'geojson') {
         (selSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
-      }
-      const pulseSrc = mapRef.current.getSource('commute-pulses-source');
-      if (pulseSrc && pulseSrc.type === 'geojson') {
-        (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
       }
     }
     isSwitchingBuildingRef.current = false;
@@ -1009,16 +954,11 @@ export function Krakow3DMap() {
 
     // 5. Wyczyszczenie warstw graficznych na mapie 3D
     if (mapRef.current) {
-      updateTrajectoriesLayer(mapRef.current, []);
       destinationMarkersRef.current.forEach((m) => m.remove());
       destinationMarkersRef.current = [];
       const selSrc = mapRef.current.getSource('selected-building-source');
       if (selSrc && selSrc.type === 'geojson') {
         (selSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
-      }
-      const pulseSrc = mapRef.current.getSource('commute-pulses-source');
-      if (pulseSrc && pulseSrc.type === 'geojson') {
-        (pulseSrc as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
       }
 
       // 6. Płynny powrót kamery do panoramy Krakowa
@@ -1074,6 +1014,7 @@ export function Krakow3DMap() {
 
     const indicatorEl = document.createElement('div');
     indicatorEl.className = 'krakow-3d-spatial-indicator group select-none pointer-events-auto cursor-pointer flex flex-col items-center';
+    indicatorEl.style.zIndex = '7';
     indicatorEl.innerHTML = `
       <div class="relative flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-slate-950/90 backdrop-blur-xl ${badgeBorder} border transition-all duration-300 group-hover:scale-105 group-hover:-translate-y-1">
         <div class="size-7 sm:size-8 rounded-xl flex items-center justify-center shrink-0 ${iconBg} text-base">
@@ -1253,7 +1194,6 @@ export function Krakow3DMap() {
       if (cached) {
         setCommuteAnalysis(cached);
         routesRef.current = cached.routes;
-        updateTrajectoriesLayer(mapRef.current, cached.routes);
         updateDestinationMarkers(mapRef.current, currentDestinations, cached.routes);
       }
     }
@@ -1484,6 +1424,12 @@ export function Krakow3DMap() {
         style={{
           cursor: isAddingTarget || isSelectingHome || isSelectingReference ? 'crosshair' : 'grab',
         }}
+      />
+
+      {/* NAKŁADKA CANVAS: ŁUKI 3D WZNOSZĄCE SIĘ NAD MIASTEM */}
+      <canvas
+        ref={arcsCanvasRef}
+        className="absolute inset-0 z-[5] w-full h-full pointer-events-none"
       />
 
       {/* PŁYWAJĄCY BANER CELOWNIKA */}
