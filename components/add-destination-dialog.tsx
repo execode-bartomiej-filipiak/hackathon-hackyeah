@@ -51,7 +51,7 @@ const CATEGORY_OPTIONS: Array<{
   { category: 'hobby', label: 'Sport / Hobby', icon: '🏋️' },
   { category: 'education', label: 'Edukacja', icon: '🎒' },
   { category: 'shopping', label: 'Zakupy', icon: '🛍️' },
-  { category: 'other', label: 'Inny cel', icon: '🎯' },
+  { category: 'other', label: 'Inne miejsce', icon: '🎯' },
 ];
 
 const FREQUENCY_OPTIONS = [
@@ -98,7 +98,7 @@ export function AddDestinationDialog({
         setFrequency(initialDestination.frequencyPerWeek);
         setTravelMode(initialDestination.travelMode);
       } else {
-        setName(initialAddress || 'Nowy cel podróży');
+        setName(initialAddress || 'Nowe odwiedzane miejsce');
         setCategory('work');
         setIcon('🏢');
         setFrequency(3);
@@ -118,7 +118,7 @@ export function AddDestinationDialog({
 
     onConfirm({
       id: initialDestination?.id,
-      name: name.trim() || initialAddress || 'Punkt docelowy',
+      name: name.trim() || initialAddress || 'Odwiedzane miejsce',
       category,
       icon,
       frequencyPerWeek: frequency,
@@ -134,10 +134,10 @@ export function AddDestinationDialog({
         <DialogHeader className="space-y-1">
           <div className="flex items-center gap-2 text-primary font-semibold text-xs">
             {isEdit ? <PencilIcon className="size-4" /> : <TargetIcon className="size-4" />}
-            <span>{isEdit ? 'Edycja Celu Podróży' : 'Nowy Cel Podróży'}</span>
+            <span>{isEdit ? 'Edycja Odwiedzanego Miejsca' : 'Nowe Odwiedzane Miejsce'}</span>
           </div>
           <DialogTitle className="text-base font-bold text-foreground">
-            {isEdit ? 'Zmień parametry celu' : 'Zdefiniuj cel na mapie'}
+            {isEdit ? 'Zmień parametry miejsca' : 'Zdefiniuj odwiedzane miejsce na mapie'}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground flex items-center gap-1.5 pt-0.5">
             <MapPinIcon className="size-3 text-primary shrink-0" />
@@ -151,7 +151,7 @@ export function AddDestinationDialog({
           {/* NAZWA CELU */}
           <div className="space-y-1.5">
             <Label htmlFor="dest-name" className="text-[11px] font-semibold text-foreground">
-              Nazwa punktu docelowego:
+              Nazwa odwiedzanego miejsca:
             </Label>
             <Input
               id="dest-name"
@@ -260,7 +260,7 @@ export function AddDestinationDialog({
             onClick={handleSave}
             className="text-xs h-8 font-medium gap-1.5"
           >
-            <span>{isEdit ? 'Zapisz zmiany' : 'Zatwierdź cel'}</span>
+            <span>{isEdit ? 'Zapisz zmiany' : 'Zatwierdź miejsce'}</span>
           </Button>
         </DialogFooter>
       </DialogContent>

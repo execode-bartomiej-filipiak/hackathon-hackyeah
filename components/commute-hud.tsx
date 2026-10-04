@@ -356,7 +356,7 @@ export function CommuteHud({
                               type="button"
                               onClick={() => onEditDestination(dest)}
                               className="opacity-0 group-hover:opacity-100 p-1 hover:text-primary transition-opacity"
-                              title="Edytuj cel"
+                              title="Edytuj miejsce"
                             >
                               <PencilIcon className="size-3" />
                             </button>
@@ -367,7 +367,7 @@ export function CommuteHud({
                               type="button"
                               onClick={() => onRemoveDestination(dest.id)}
                               className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 transition-opacity"
-                              title="Usuń cel"
+                              title="Usuń miejsce"
                             >
                               <XIcon className="size-3.5" />
                             </button>
@@ -673,7 +673,7 @@ export function CommuteHud({
                                 onEditDestination(dest);
                               }}
                               className="opacity-0 group-hover:opacity-100 p-1 hover:text-primary transition-opacity"
-                              title="Edytuj cel"
+                              title="Edytuj miejsce"
                             >
                               <PencilIcon className="size-3" />
                             </button>
@@ -687,7 +687,7 @@ export function CommuteHud({
                                 onRemoveDestination(route.destinationId);
                               }}
                               className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 transition-opacity"
-                              title="Usuń cel"
+                              title="Usuń miejsce"
                             >
                               <XIcon className="size-3.5" />
                             </button>
