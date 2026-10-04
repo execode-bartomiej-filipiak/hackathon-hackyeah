@@ -561,7 +561,7 @@ export function Krakow3DMap() {
         const route = routes.find((r) => r.destinationId === dest.id);
         const pin = DESTINATION_PIN_STYLES[route?.status ?? 'none'];
         const el = document.createElement('div');
-        el.className = 'commute-destination-marker cursor-pointer select-none group';
+        el.className = 'commute-destination-marker pointer-events-none select-none group';
         el.title = `${dest.name}${route ? ` (${route.durationMinutes} min)` : ''}`;
         el.innerHTML = `
           <div class="flex flex-col items-center">
@@ -586,17 +586,6 @@ export function Krakow3DMap() {
             </div>
           </div>
         `;
-
-        el.onclick = (event) => {
-          event.stopPropagation();
-          map.flyTo({
-            center: dest.coordinates,
-            zoom: 16.5,
-            pitch: 62,
-            duration: 1600,
-            essential: true,
-          });
-        };
 
         el.style.zIndex = '6';
 
@@ -784,33 +773,36 @@ export function Krakow3DMap() {
 
         cachedAnalysisRef.current = {};
 
+        let currentPointType: 'home' | 'reference' = 'home';
+
         if (isRefMode) {
           setReferenceBuilding(buildingInfo);
           referenceBuildingRef.current = buildingInfo;
           setActiveFocusPoint('reference');
           activeFocusPointRef.current = 'reference';
+          currentPointType = 'reference';
         } else if (isHomeMode) {
           setHomeBuilding(buildingInfo);
           homeBuildingRef.current = buildingInfo;
           setActiveFocusPoint('home');
           activeFocusPointRef.current = 'home';
+          currentPointType = 'home';
         } else {
           if (!homeBuildingRef.current) {
             setHomeBuilding(buildingInfo);
             homeBuildingRef.current = buildingInfo;
             setActiveFocusPoint('home');
             activeFocusPointRef.current = 'home';
+            currentPointType = 'home';
           } else {
             setReferenceBuilding(buildingInfo);
             referenceBuildingRef.current = buildingInfo;
             setActiveFocusPoint('reference');
             activeFocusPointRef.current = 'reference';
+            currentPointType = 'reference';
           }
         }
         setSelectedBuilding(buildingInfo);
-
-        const currentPointType: 'home' | 'reference' =
-          isHomeMode || (!isRefMode && !homeBuildingRef.current) ? 'home' : 'reference';
 
         // Wyświetlenie efektownego wskaźnika przestrzennego 3D oraz podświetlenia bryły
         showBuildingHighlightAndIndicator(mapInstance, buildingInfo, currentPointType);

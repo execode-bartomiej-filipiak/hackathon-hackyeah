@@ -478,7 +478,7 @@ export function CommuteHud({
               {/* 2. OBECNE I NOWE MIEJSCE ZAMIESZKANIA W TRYBIE ANALIZY */}
               {(effectiveHomeName || effectiveRefName) && (
                 <div className="space-y-1.5 pt-1 border-t border-border/40">
-                  {effectiveHomeName && (
+                  {effectiveHomeName ? (
                     <div
                       onClick={() => onSelectFocusPoint?.('home')}
                       title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla obecnego miejsca zamieszkania"
@@ -519,9 +519,29 @@ export function CommuteHud({
                         </Button>
                       )}
                     </div>
+                  ) : (
+                    (onToggleSelectHome || onToggleSelectOrigin) && (
+                      <Button
+                        size="sm"
+                        variant={isSelectingHome || isSelectingOrigin ? 'default' : 'outline'}
+                        onClick={onToggleSelectHome || onToggleSelectOrigin}
+                        className={`w-full text-xs h-8 gap-2 font-medium transition-all ${
+                          isSelectingHome || isSelectingOrigin
+                            ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
+                            : 'border-dashed border-primary/50 hover:bg-primary/5 text-foreground'
+                        }`}
+                      >
+                        <HomeIcon className="size-3.5 text-primary" />
+                        <span>
+                          {isSelectingHome || isSelectingOrigin
+                            ? 'Wskaż budynek na mapie...'
+                            : '+ Wskaż obecne miejsce zamieszkania'}
+                        </span>
+                      </Button>
+                    )
                   )}
 
-                  {effectiveRefName && (
+                  {effectiveRefName ? (
                     <div
                       onClick={() => onSelectFocusPoint?.('reference')}
                       title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla nowego miejsca zamieszkania"
@@ -562,6 +582,26 @@ export function CommuteHud({
                         </Button>
                       )}
                     </div>
+                  ) : (
+                    onToggleSelectReference && (
+                      <Button
+                        size="sm"
+                        variant={isSelectingReference ? 'default' : 'outline'}
+                        onClick={onToggleSelectReference}
+                        className={`w-full text-xs h-8 gap-2 font-medium transition-all ${
+                          isSelectingReference
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white animate-pulse'
+                            : 'border-dashed border-blue-500/40 hover:bg-blue-500/5 text-foreground'
+                        }`}
+                      >
+                        <Building2Icon className="size-3.5 text-blue-500" />
+                        <span>
+                          {isSelectingReference
+                            ? 'Wskaż budynek na mapie...'
+                            : '+ Wskaż nowe miejsce zamieszkania'}
+                        </span>
+                      </Button>
+                    )
                   )}
                 </div>
               )}
