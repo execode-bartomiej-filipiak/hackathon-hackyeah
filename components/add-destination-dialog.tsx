@@ -46,13 +46,13 @@ const CATEGORY_OPTIONS: Array<{
   label: string;
   icon: string;
 }> = [
-  { category: 'work', label: 'Praca / Biuro', icon: '🏢' },
-  { category: 'family', label: 'Dom / Rodzina', icon: '🏡' },
-  { category: 'hobby', label: 'Sport / Hobby', icon: '🏋️' },
-  { category: 'education', label: 'Edukacja', icon: '🎒' },
-  { category: 'shopping', label: 'Zakupy', icon: '🛍️' },
-  { category: 'other', label: 'Inne miejsce', icon: '🎯' },
-];
+    { category: 'work', label: 'Praca / Biuro', icon: '🏢' },
+    { category: 'family', label: 'Dom / Rodzina', icon: '🏡' },
+    { category: 'hobby', label: 'Sport / Hobby', icon: '🏋️' },
+    { category: 'education', label: 'Edukacja', icon: '🎒' },
+    { category: 'shopping', label: 'Zakupy', icon: '🛍️' },
+    { category: 'other', label: 'Inne miejsce', icon: '🎯' },
+  ];
 
 const FREQUENCY_OPTIONS = [
   { value: 1, label: '1x / tydz.' },
@@ -66,11 +66,11 @@ const TRAVEL_MODES: Array<{
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }> = [
-  { mode: 'transit', label: 'MPK', icon: TrainIcon },
-  { mode: 'driving', label: 'Auto', icon: CarIcon },
-  { mode: 'bicycling', label: 'Rower', icon: BikeIcon },
-  { mode: 'walking', label: 'Pieszo', icon: FootprintsIcon },
-];
+    { mode: 'transit', label: 'MPK', icon: TrainIcon },
+    { mode: 'driving', label: 'Auto', icon: CarIcon },
+    { mode: 'bicycling', label: 'Rower', icon: BikeIcon },
+    { mode: 'walking', label: 'Pieszo', icon: FootprintsIcon },
+  ];
 
 export function AddDestinationDialog({
   open,
@@ -137,7 +137,7 @@ export function AddDestinationDialog({
             <span>{isEdit ? 'Edycja Odwiedzanego Miejsca' : 'Nowe Odwiedzane Miejsce'}</span>
           </div>
           <DialogTitle className="text-base font-bold text-foreground">
-            {isEdit ? 'Zmień parametry miejsca' : 'Zdefiniuj odwiedzane miejsce na mapie'}
+            {isEdit ? 'Zmień parametry miejsca' : 'Zdefiniuj odwiedzane miejsce'}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground flex items-center gap-1.5 pt-0.5">
             <MapPinIcon className="size-3 text-primary shrink-0" />
@@ -175,11 +175,10 @@ export function AddDestinationDialog({
                     key={cat.category}
                     type="button"
                     onClick={() => handleSelectCategory(cat)}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs transition-colors ${
-                      isSelected
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs transition-colors ${isSelected
                         ? 'border-primary bg-primary/10 text-primary font-semibold shadow-xs'
                         : 'border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     <span>{cat.icon}</span>
                     <span className="truncate text-[11px] sm:text-xs">{cat.label}</span>
@@ -202,11 +201,10 @@ export function AddDestinationDialog({
                     key={f.value}
                     type="button"
                     onClick={() => setFrequency(f.value)}
-                    className={`py-1.5 px-2 rounded-lg border text-xs text-center font-medium transition-colors ${
-                      isSelected
+                    className={`py-1.5 px-2 rounded-lg border text-xs text-center font-medium transition-colors ${isSelected
                         ? 'border-primary bg-primary text-primary-foreground shadow-xs font-semibold'
                         : 'border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     {f.label}
                   </button>
@@ -229,11 +227,10 @@ export function AddDestinationDialog({
                     key={m.mode}
                     type="button"
                     onClick={() => setTravelMode(m.mode)}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${
-                      isSelected
+                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${isSelected
                         ? 'border-primary bg-primary text-primary-foreground shadow-xs font-semibold'
                         : 'border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     <Icon className="size-3.5" />
                     <span>{m.label}</span>
