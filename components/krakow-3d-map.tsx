@@ -636,10 +636,6 @@ export function Krakow3DMap() {
     });
 
     mapInstance.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-left');
-    mapInstance.addControl(
-      new maplibregl.AttributionControl({ compact: true, customAttribution: '3D Kraków NearBy Score PoC' }),
-      'bottom-right'
-    );
 
     mapInstance.on('load', () => {
       setMapLoaded(true);
