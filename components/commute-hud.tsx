@@ -312,7 +312,7 @@ export function CommuteHud({
               {/* 3. TRZECIE MIEJSCE: SEKCJA CELE */}
               <div className="space-y-2 pt-1 border-t border-border/40 animate-in fade-in">
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
-                  <span>Cele ({activeProfile.destinations.length}):</span>
+                  <span>Odwiedzane miejsca ({activeProfile.destinations.length}):</span>
                 </div>
 
                 {activeProfile.destinations.length > 0 && (
@@ -390,7 +390,7 @@ export function CommuteHud({
                       }`}
                   >
                     <CrosshairIcon className="size-3.5" />
-                    <span>{isAddingTarget ? 'Anuluj wybór celu' : '+ Dodaj nowy cel na mapie'}</span>
+                    <span>{isAddingTarget ? 'Anuluj wybór' : '+ Wskaż odwiedzane miejsce'}</span>
                   </Button>
                 )}
               </div>
@@ -610,16 +610,11 @@ export function CommuteHud({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground font-semibold px-0.5">
                   <span className="flex items-center gap-1.5">
-                    <span>Cele ({analysis.routes.length}):</span>
+                    <span>Odwiedzane miejsca ({analysis.routes.length}):</span>
                     <span className="text-[9px] font-medium text-muted-foreground/80 border border-border/70 rounded-full px-1.5 py-0.5 leading-none">
                       ×2 tam i z powrotem
                     </span>
                   </span>
-                  {selectedBuildingName && (
-                    <span className="font-normal truncate max-w-[130px] text-foreground">
-                      Z: {selectedBuildingName}
-                    </span>
-                  )}
                 </div>
 
                 <div className="divide-y divide-border/60 rounded-xl border border-border bg-card overflow-hidden">
@@ -723,7 +718,7 @@ export function CommuteHud({
                       }`}
                   >
                     <CrosshairIcon className="size-3.5" />
-                    <span>{isAddingTarget ? 'Anuluj wybór celu' : '+ Dodaj nowy cel na mapie'}</span>
+                    <span>{isAddingTarget ? 'Anuluj wybór' : '+ Wskaż odwiedzane miejsce'}</span>
                   </Button>
                 )}
               </div>
