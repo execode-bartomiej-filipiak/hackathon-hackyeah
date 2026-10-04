@@ -11,7 +11,7 @@ import type {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Button } from '@/components/ui/button';
-import { RotateCwIcon, InfoIcon, LocateFixedIcon } from 'lucide-react';
+import { RotateCwIcon, LocateFixedIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { COMMUTE_PROFILES } from '@/mock/commute-presets';
 import {
@@ -1846,11 +1846,6 @@ export function Krakow3DMap() {
       />
 
 
-      {/* INSTRUKCJA DLA UŻYTKOWNIKA */}
-      <div className="absolute bottom-3 right-3 z-10 pointer-events-none hidden sm:flex items-center gap-1.5 bg-background/85 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-border text-[11px] text-muted-foreground shadow-sm">
-        <InfoIcon className="size-3.5 text-primary" />
-        <span>Kliknij dowolny budynek w 3D, aby wyliczyć czas dojazdów do punktów życia.</span>
-      </div>
 
       {/* MODAL DEFINIOWANIA LUB EDYCJI CELU */}
       <AddDestinationDialog
