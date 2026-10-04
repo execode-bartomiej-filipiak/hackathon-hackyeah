@@ -147,7 +147,7 @@ export function CommuteHud({
             <div className="flex items-center gap-2">
               <span className="flex size-2 rounded-full bg-primary animate-pulse" />
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Analiza Dojazdów 3D
+                Analiza Dojazdów
               </span>
             </div>
             {onResetData && (
@@ -176,11 +176,10 @@ export function CommuteHud({
                   <div
                     onClick={() => onSelectFocusPoint?.('home')}
                     title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla obecnego miejsca zamieszkania"
-                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-                      activeFocusPoint === 'home'
+                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${activeFocusPoint === 'home'
                         ? 'border-primary ring-2 ring-primary/40 bg-primary/10 shadow-xs'
                         : 'border-primary/30 bg-primary/5 hover:border-primary/60 hover:bg-primary/10'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2 min-w-0 pr-1.5">
                       <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -224,11 +223,10 @@ export function CommuteHud({
                     size="sm"
                     variant={isSelectingHome || isSelectingOrigin ? 'default' : 'outline'}
                     onClick={onToggleSelectHome || onToggleSelectOrigin}
-                    className={`w-full text-xs h-8.5 gap-2 font-medium transition-all ${
-                      isSelectingHome || isSelectingOrigin
+                    className={`w-full text-xs h-8.5 gap-2 font-medium transition-all ${isSelectingHome || isSelectingOrigin
                         ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
                         : 'border-dashed border-primary/50 hover:bg-primary/5 text-foreground'
-                    }`}
+                      }`}
                   >
                     <HomeIcon className="size-3.5 text-primary" />
                     <span>
@@ -249,11 +247,10 @@ export function CommuteHud({
                   <div
                     onClick={() => onSelectFocusPoint?.('reference')}
                     title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla nowego miejsca zamieszkania"
-                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-                      activeFocusPoint === 'reference'
+                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${activeFocusPoint === 'reference'
                         ? 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-500/10 shadow-xs'
                         : 'border-blue-500/30 bg-blue-500/5 hover:border-blue-500/60 hover:bg-blue-500/10'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2 min-w-0 pr-1.5">
                       <div className="size-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
@@ -297,11 +294,10 @@ export function CommuteHud({
                     size="sm"
                     variant={isSelectingReference ? 'default' : 'outline'}
                     onClick={onToggleSelectReference}
-                    className={`w-full text-xs h-8.5 gap-2 font-medium transition-all ${
-                      isSelectingReference
+                    className={`w-full text-xs h-8.5 gap-2 font-medium transition-all ${isSelectingReference
                         ? 'bg-blue-600 hover:bg-blue-700 text-white animate-pulse'
                         : 'border-dashed border-blue-500/40 hover:bg-blue-500/5 text-foreground'
-                    }`}
+                      }`}
                   >
                     <Building2Icon className="size-3.5 text-blue-500" />
                     <span>
@@ -388,11 +384,10 @@ export function CommuteHud({
                     size="sm"
                     variant={isAddingTarget ? 'default' : 'outline'}
                     onClick={onToggleAddTarget}
-                    className={`w-full text-xs h-8 gap-2 font-medium transition-all ${
-                      isAddingTarget
+                    className={`w-full text-xs h-8 gap-2 font-medium transition-all ${isAddingTarget
                         ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse'
                         : 'hover:border-primary/50 border-dashed'
-                    }`}
+                      }`}
                   >
                     <CrosshairIcon className="size-3.5" />
                     <span>{isAddingTarget ? 'Anuluj wybór celu' : '+ Dodaj nowy cel na mapie'}</span>
@@ -426,9 +421,8 @@ export function CommuteHud({
                     </div>
                     <div className="flex items-baseline gap-1.5 mt-1">
                       <span
-                        className={`text-3xl font-black leading-none tabular-nums ${
-                          timeSaved ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
-                        }`}
+                        className={`text-3xl font-black leading-none tabular-nums ${timeSaved ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
+                          }`}
                       >
                         {Math.abs(savedHours).toFixed(1)}
                       </span>
@@ -488,11 +482,10 @@ export function CommuteHud({
                     <div
                       onClick={() => onSelectFocusPoint?.('home')}
                       title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla obecnego miejsca zamieszkania"
-                      className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
-                        activeFocusPoint === 'home'
+                      className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${activeFocusPoint === 'home'
                           ? 'border-primary ring-2 ring-primary/40 bg-primary/10 shadow-xs'
                           : 'border-primary/30 bg-primary/5 hover:border-primary/60 hover:bg-primary/10'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-1.5">
                         <HomeIcon className="size-3.5 text-primary shrink-0" />
@@ -532,11 +525,10 @@ export function CommuteHud({
                     <div
                       onClick={() => onSelectFocusPoint?.('reference')}
                       title="Kliknij, aby wycentrować widok 3D i pokazać dojazdy dla nowego miejsca zamieszkania"
-                      className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
-                        activeFocusPoint === 'reference'
+                      className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${activeFocusPoint === 'reference'
                           ? 'border-blue-500 ring-2 ring-blue-500/40 bg-blue-500/10 shadow-xs'
                           : 'border-blue-500/30 bg-blue-500/5 hover:border-blue-500/60 hover:bg-blue-500/10'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-1.5">
                         <Building2Icon className="size-3.5 text-blue-500 shrink-0" />
@@ -685,11 +677,10 @@ export function CommuteHud({
                     size="sm"
                     variant={isAddingTarget ? 'default' : 'outline'}
                     onClick={onToggleAddTarget}
-                    className={`w-full text-xs h-8 gap-2 font-medium mt-1 transition-all ${
-                      isAddingTarget
+                    className={`w-full text-xs h-8 gap-2 font-medium mt-1 transition-all ${isAddingTarget
                         ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse'
                         : 'hover:border-primary/50 border-dashed'
-                    }`}
+                      }`}
                   >
                     <CrosshairIcon className="size-3.5" />
                     <span>{isAddingTarget ? 'Anuluj wybór celu' : '+ Dodaj nowy cel na mapie'}</span>
@@ -725,9 +716,8 @@ export function CommuteHud({
                 )}
               </span>
               <ChevronDownIcon
-                className={`size-3.5 text-muted-foreground shrink-0 transition-transform ${
-                  isPresetsOpen ? 'rotate-180' : ''
-                }`}
+                className={`size-3.5 text-muted-foreground shrink-0 transition-transform ${isPresetsOpen ? 'rotate-180' : ''
+                  }`}
               />
             </button>
 
@@ -744,11 +734,10 @@ export function CommuteHud({
                         setIsPresetsOpen(false);
                       }}
                       title={`${preset.description}${preset.scenario ? ` • ${preset.scenario}` : ''} • ${preset.destinationsCount} cele, ${preset.weeklyVisits} wizyt/tydz.`}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all cursor-pointer ${
-                        isActive
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all cursor-pointer ${isActive
                           ? 'border-primary ring-1 ring-primary/25 bg-primary/5'
                           : 'border-border bg-card hover:border-primary/40 hover:bg-primary/5'
-                      }`}
+                        }`}
                     >
                       <span className="text-sm leading-none shrink-0">{preset.icon}</span>
                       <span className="text-[11px] font-semibold text-foreground truncate flex-1 min-w-0">
