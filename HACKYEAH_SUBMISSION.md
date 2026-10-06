@@ -103,7 +103,7 @@ N/A — 2-osobowy zespół zrealizował projekt w całości.
 ### Your video presentation (Public or Listed YouTube link)
 
 ```text
-[Wklej link do wideo z YouTube - status: Niepubliczny / Listed]
+https://www.youtube.com/watch?v=HsMPE8g4VbI
 ```
 
 ---

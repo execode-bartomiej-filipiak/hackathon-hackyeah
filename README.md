@@ -15,7 +15,7 @@
   <b>Transforming real estate and urban living decisions from static distance filters into a personalized, multi-destination 3D commute audit.</b>
 </p>
 
-[🌐 **Live Demo (Production)**](https://hackathon-hackyeah.vercel.app/) • [🎬 **Video Walkthrough (YouTube)**](https://youtu.be/otu_DwYSUmY) • [📊 **Presentation Slides (Google Drive)**](https://drive.google.com/file/d/1yv22LYz_oc4EaSoeeSoE0a38YRRmwRHC/view?usp=sharing)
+[🌐 **Live Demo (Production)**](https://hackathon-hackyeah.vercel.app/) • [🎬 **Video Walkthrough (YouTube)**](https://www.youtube.com/watch?v=HsMPE8g4VbI) • [📊 **Presentation Slides (Google Drive)**](https://drive.google.com/file/d/1yv22LYz_oc4EaSoeeSoE0a38YRRmwRHC/view?usp=sharing)
 
 ---
 
@@ -30,7 +30,7 @@
 | Resource | Link | Description |
 |---|---|---|
 | 🚀 **Live Application** | [hackathon-hackyeah.vercel.app](https://hackathon-hackyeah.vercel.app/) | Zero-setup, instant browser demo |
-| 🎥 **Video Pitch** | [YouTube Video (3 mins)](https://youtu.be/otu_DwYSUmY) | Product walkthrough & live scenario demo |
+| 🎥 **Video Pitch** | [YouTube Video (3 mins)](https://www.youtube.com/watch?v=HsMPE8g4VbI) | Product walkthrough & live scenario demo |
 | 📑 **Slide Deck** | [Google Drive Presentation](https://drive.google.com/file/d/1yv22LYz_oc4EaSoeeSoE0a38YRRmwRHC/view?usp=sharing) | Problem statement, methodology & vision |
 | 💻 **Source Code** | [GitHub Repository](https://github.com/execode-bartomiej-filipiak/hackathon-hackyeah) | Full open-source codebase |
 
